@@ -16,3 +16,10 @@ openssl ecparam -name prime256v1 -genkey -noout -out ./keys/private_key.pem
 openssl req -new -x509 -key ./keys/private_key.pem -out ./keys/certificate.pem -days 365 -subj "/CN=localhost"
 openssl pkcs8 -topk8 -nocrypt -in ./keys/private_key.pem -out ./keys/private_key.pkcs.pem
 ```
+
+
+# Usage
+Setup a config file for all participating nodes, generate keys, then start the server with
+```
+cargo run --release -- config.yaml
+```
