@@ -2,9 +2,13 @@ mod poller;
 
 use crate::poller::{State, poller};
 use anyhow::{Context, Result};
+use chrono::Local;
+use env_logger::Builder;
+use log::{LevelFilter, error, info};
 use rouille::{Server, router};
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -23,6 +27,8 @@ pub struct ServerConfig {
 #[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone, Serialize)]
 pub struct NodeConfig {
     pub name: String,
+    #[serde(default)]
+    pub telegram_handle: Option<String>,
     pub address: String,
 }
 
@@ -39,7 +45,7 @@ pub struct Config {
 }
 
 async fn load_config(path: PathBuf) -> Result<Config> {
-    println!("Loading config from {path:?}");
+    info!("Loading config from {path:?}");
 
     let config_str = fs::read_to_string(path).await?;
     let config: Config = serde_yml::from_str(&config_str)?;
@@ -66,12 +72,25 @@ pub struct ObituaryResponse {
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
+    Builder::new()
+        .format(|buf, record| {
+            writeln!(
+                buf,
+                "{} [{}]::{} - {}",
+                Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                record.level(),
+                record.target(),
+                record.args()
+            )
+        })
+        .filter(None, LevelFilter::Info)
+        .init();
 
-    println!("Starting freecaster-grid v{VERSION}");
+    info!("Starting freecaster-grid v{VERSION}");
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 2 {
-        eprintln!("Usage: {} <config_path>", args[0]);
+        error!("Usage: {} <config_path>", args[0]);
         std::process::exit(1);
     }
 
@@ -79,18 +98,18 @@ async fn main() -> Result<()> {
     let config_path = PathBuf::from(&args[1]);
     let mut config = load_config(config_path).await?;
     if let Ok(token) = env::var("TELEGRAM_TOKEN") {
-        println!("Overriding telegram token with env var");
+        info!("Overriding telegram token with env var");
         config.telegram_token = token;
     }
 
     if let Ok(chat_id) = env::var("TELEGRAM_CHAT_ID") {
-        println!("Overriding telegram chat id with env var");
+        info!("Overriding telegram chat id with env var");
         config.telegram_chat_id = i64::from_str(&chat_id)?;
     }
 
     let config = Arc::new(config);
 
-    println!("Loaded configuration, this node is: {}", config.name);
+    info!("Loaded configuration, this node is: {}", config.name);
     let cert = fs::read(&config.server.cert_path)
         .await
         .with_context(|| "Failed to read certificate")?;
@@ -105,11 +124,13 @@ async fn main() -> Result<()> {
     let server_state = state.clone();
 
     js.spawn(async move {
-        println!("Starting server `{}`", server_config.server.host);
+        info!("Starting server `{}`", server_config.server.host);
 
         Server::new_ssl(server_config.server.host.clone(), move |request| {
             router!(request,
                 (GET) (/) => {
+                    info!("Called for status");
+
                     rouille::Response::json(&StatusResponse {
                         name: server_config.name.clone(),
                         version: VERSION.to_string(),
@@ -118,7 +139,8 @@ async fn main() -> Result<()> {
                 },
 
                 (GET) (/obituary) => {
-                    println!("Called for obituary");
+                    info!("Called for obituary");
+
                     let gr = server_state.lock().expect("Failed to lock state");
                     let dead_nodes = gr.failing_nodes.iter().filter(|fs| fs.is_dead()).map(|fs| DeadNodeResponse {
                         name: fs.name.clone(),

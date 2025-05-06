@@ -9,6 +9,7 @@ server:
 
 nodes:
   - name: "Test1"
+    telegram_handle: "Dewyer"
     address: "https://localhost:4242"
   - name: "Test3"
     address: "https://localhost:4244"

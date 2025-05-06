@@ -1,12 +1,14 @@
 use crate::{Config, NodeConfig, ObituaryResponse, StatusResponse};
 use anyhow::Result;
+use chrono::{DateTime, Utc};
+use log::{error, info, warn};
 use rand::Rng;
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 const DEAD_AFTER: usize = 3;
 
@@ -41,7 +43,7 @@ pub struct DeadConfirmation {
 #[derive(Clone)]
 pub struct FailingNodeState {
     pub name: String,
-    pub last_fail: Duration,
+    pub last_fail: DateTime<Utc>,
     pub fail_count: usize,
     pub confirmations: HashMap<String, DeadConfirmation>,
     pub announcement_rolls: HashMap<String, usize>,
@@ -50,7 +52,7 @@ pub struct FailingNodeState {
 }
 
 impl FailingNodeState {
-    pub fn new_failed(name: String, last_fail: Duration) -> Self {
+    pub fn new_failed(name: String, last_fail: DateTime<Utc>) -> Self {
         Self {
             name,
             last_fail,
@@ -76,7 +78,7 @@ impl FailingNodeState {
 }
 
 pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Result<()> {
-    println!("Starting poller `{}`", poller_config.name);
+    info!("Starting poller `{}`", poller_config.name);
 
     let client = Client::builder()
         .use_rustls_tls()
@@ -85,12 +87,12 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
         .build()?;
 
     loop {
-        let time = SystemTime::now().duration_since(UNIX_EPOCH)?;
+        let time = Utc::now();
 
-        println!("Polling nodes @`{time:?}`");
+        info!("Polling nodes @`{time:?}`");
         let mut poll_res = HashMap::new();
         for node in poller_config.nodes.iter() {
-            println!("Checking node {}: {}", node.name, node.address);
+            info!("Checking node {}: {}", node.name, node.address);
             let res = poll_node(&client, &poller_config.name, node).await;
             poll_res.insert(node.clone(), res);
         }
@@ -107,7 +109,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
                             if fail_state.is_dead() {
                                 let roll = rand::rng().random_range(0usize..usize::MAX);
                                 fail_state.local_announcement_roll = Some(roll);
-                                println!(
+                                warn!(
                                     "Node `{}` is dead my roll: `{}`, last fail: {:?}",
                                     node.name, roll, fail_state.last_fail
                                 );
@@ -121,7 +123,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
                     // back up
                     if fail_state.is_dead() {
                         fail_state.reset();
-                        println!("Node `{}` is back up", node.name);
+                        info!("Node `{}` is back up", node.name);
                     }
                 }
             }
@@ -143,7 +145,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
                 }
 
                 let Some(orb) = call_obituary(&client, &poller_config.name, node).await else {
-                    println!("Failed to call Obituary for node `{}`", node.name);
+                    error!("Failed to call Obituary for node `{}`", node.name);
                     continue;
                 };
 
@@ -161,7 +163,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
                         .iter_mut()
                         .find(|fs| fs.name == dead_resp.name && fs.is_dead())
                     {
-                        println!("Node `{}` is confirmed dead by `{from}`", dead_resp.name);
+                        warn!("Node `{}` is confirmed dead by `{from}`", dead_resp.name);
                         fs.confirmations.insert(
                             from.clone(),
                             DeadConfirmation {
@@ -214,7 +216,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
                     .filter(|(_, val)| val.confirmed_roll.is_none())
                     .count();
                 if true_confirmations > false_confirmations {
-                    println!("Node `{}` is confirmed dead by quorum", fs.name);
+                    warn!("Node `{}` is confirmed dead by quorum", fs.name);
                 }
 
                 let mut confirmations_rolls = fs
@@ -227,11 +229,16 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
 
                 let winner = confirmations_rolls.last().expect("no confirmations?");
                 if winner.0 == poller_config.name {
-                    println!(
+                    warn!(
                         "Node `{}`'s death to be announced by this node death rolled: {}",
                         fs.name, winner.1
                     );
-                    announcements.push(fs.name.clone());
+                    let node = poller_config
+                        .nodes
+                        .iter()
+                        .find(|n| n.name == fs.name)
+                        .expect("node");
+                    announcements.push(node.clone());
                 }
                 fs.announced = true; // announced death
             }
@@ -274,20 +281,20 @@ async fn make_whatever_logged_http_call<T: DeserializeOwned>(
                     .json::<T>()
                     .await
                     .inspect_err(|err| {
-                        println!("Failed to parse response for `{purpose}`: {err:?}");
+                        error!("Failed to parse response for `{purpose}`: {err:?}");
                     })
                     .ok()
                 else {
                     return Ok(None);
                 };
 
-                println!(
+                info!(
                     "Node `{}` returned a fine response for `{purpose}`",
                     node.name
                 );
                 Ok(Some(correct_response))
             } else {
-                println!(
+                error!(
                     "Node `{}` returned error status: {}",
                     node.name,
                     response.status()
@@ -299,7 +306,7 @@ async fn make_whatever_logged_http_call<T: DeserializeOwned>(
             }
         }
         Err(e) => {
-            println!("Failed to connect to node {}: {:?}", node.name, e);
+            error!("Failed to connect to node {}: {:?}", node.name, e);
             Err(e.into())
         }
     }
@@ -310,12 +317,12 @@ async fn poll_node(client: &Client, me: &str, node: &NodeConfig) -> NodeResult {
         .await
     {
         Ok(Some(correct_response)) => {
-            println!(
+            info!(
                 "Node `{}`@`{}` is up",
                 correct_response.name, correct_response.version
             );
             if node.name != correct_response.name {
-                println!(
+                warn!(
                     "Node name mismatch: `{}` != `{}`",
                     node.name, correct_response.name
                 );
@@ -324,7 +331,7 @@ async fn poll_node(client: &Client, me: &str, node: &NodeConfig) -> NodeResult {
             NodeResult { failing: false }
         }
         Ok(None) => {
-            println!("Node `{}` is up but weird", node.name);
+            warn!("Node `{}` is up but weird", node.name);
 
             NodeResult { failing: false }
         }
@@ -339,13 +346,22 @@ async fn call_obituary(client: &Client, me: &str, node: &NodeConfig) -> Option<O
         .flatten()
 }
 
-async fn announce_death_telegram(me: &str, dead: &str, config: &Arc<Config>) {
+async fn announce_death_telegram(me: &str, dead: &NodeConfig, config: &Arc<Config>) {
+    let end = if let Some(tg) = dead.telegram_handle.as_ref() {
+        format!("- @{tg}")
+    } else {
+        "".to_string()
+    };
+
     let res = telegram_notifyrs::send_message(
-        format!("Node: `{dead}` has unfortunately died, announced by: `{me}`"),
+        format!(
+            "Grid announcement, `{}` has unfortunately died, announced by: `{me}`{end}",
+            dead.name
+        ),
         &config.telegram_token,
         config.telegram_chat_id,
     );
     if res.error() {
-        println!("Telegram notification failed: {}", res.status());
+        error!("Telegram notification failed: {}", res.status());
     }
 }
