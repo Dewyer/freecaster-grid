@@ -2,6 +2,7 @@ name: Test2
 telegram_token: "test"
 telegram_chat_id: 0
 announcement_mode: log
+secret_key: almafa
 
 server:
   host: "localhost:4243"
@@ -10,7 +11,8 @@ server:
 
 nodes:
   - name: "Test1"
-    telegram_handle: "Dewyer"
     address: "https://localhost:4242"
+  - name: "Test2"
+    address: "https://localhost:4243"
   - name: "Test3"
     address: "https://localhost:4244"

@@ -2,6 +2,7 @@ name: Test1
 telegram_token: "test"
 telegram_chat_id: 0
 announcement_mode: log
+secret_key: almafa
 
 server:
   host: "localhost:4242"
@@ -9,6 +10,8 @@ server:
   key_path: "./keys/private_key.pkcs.pem"
 
 nodes:
+  - name: "Test1"
+    address: "https://localhost:4242"
   - name: "Test2"
     address: "https://localhost:4243"
   - name: "Test3"

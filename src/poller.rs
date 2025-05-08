@@ -1,4 +1,7 @@
-use crate::{AnnouncementMode, Config, NodeConfig, ObituaryResponse, StatusResponse};
+use crate::{
+    AnnouncementMode, Config, GridNodeResponse, GridNodeStatus, NodeConfig, ObituaryResponse,
+    StatusResponse,
+};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use log::{error, info, warn};
@@ -14,7 +17,7 @@ const DEAD_AFTER: usize = 3;
 const POLL_INTERVAL: Duration = Duration::from_secs(3);
 
 pub struct StateInner {
-    pub failing_nodes: Vec<FailingNodeState>,
+    pub node_state: Vec<NodeState>,
 }
 
 #[derive(Clone)]
@@ -30,9 +33,7 @@ impl Deref for State {
 
 impl State {
     pub fn new() -> Self {
-        Self(Arc::new(Mutex::new(StateInner {
-            failing_nodes: vec![],
-        })))
+        Self(Arc::new(Mutex::new(StateInner { node_state: vec![] })))
     }
 }
 
@@ -42,9 +43,10 @@ pub struct DeadConfirmation {
 }
 
 #[derive(Clone)]
-pub struct FailingNodeState {
+pub struct NodeState {
     pub name: String,
-    pub last_fail: DateTime<Utc>,
+    pub last_poll: Option<DateTime<Utc>>,
+    pub last_fail: Option<DateTime<Utc>>,
     pub fail_count: usize,
     pub confirmations: HashMap<String, DeadConfirmation>,
     pub announcement_rolls: HashMap<String, usize>,
@@ -52,12 +54,13 @@ pub struct FailingNodeState {
     pub announced: bool,
 }
 
-impl FailingNodeState {
-    pub fn new_failed(name: String, last_fail: DateTime<Utc>) -> Self {
+impl NodeState {
+    pub fn new(name: String) -> Self {
         Self {
             name,
-            last_fail,
-            fail_count: 1,
+            last_poll: None,
+            last_fail: None,
+            fail_count: 0,
             confirmations: Default::default(),
             announcement_rolls: Default::default(),
             local_announcement_roll: None,
@@ -74,7 +77,24 @@ impl FailingNodeState {
         self.confirmations.clear();
         self.announcement_rolls.clear();
         self.local_announcement_roll = None;
+        self.last_fail = None;
         self.announced = false;
+    }
+
+    pub fn to_api_response(&self) -> GridNodeResponse {
+        let status = if self.is_dead() && self.announced {
+            GridNodeStatus::Dead
+        } else if self.is_dead() {
+            GridNodeStatus::Dying
+        } else {
+            GridNodeStatus::Alive
+        };
+
+        GridNodeResponse {
+            name: self.name.clone(),
+            last_poll: self.last_poll,
+            status,
+        }
     }
 }
 
@@ -86,6 +106,14 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
         .add_root_certificate(reqwest::Certificate::from_pem(cert)?)
         .danger_accept_invalid_certs(true)
         .build()?;
+
+    // init state
+    {
+        let mut gr = state.lock().expect("Failed to lock state");
+        for node in poller_config.nodes.iter() {
+            gr.node_state.push(NodeState::new(node.name.clone()));
+        }
+    }
 
     loop {
         let time = Utc::now();
@@ -101,33 +129,37 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
         let mut poll_res = HashMap::new();
         for node in poller_config.nodes.iter() {
             info!("Checking node {}: {}", node.name, node.address);
+            let time = Utc::now();
             let res = poll_node(&client, &poller_config.name, node).await;
-            poll_res.insert(node.clone(), res);
+            poll_res.insert(node.clone(), (res, time));
         }
 
         let dead_copies = {
             let mut gr = state.lock().expect("Failed to lock state");
-            for (node, res) in poll_res {
-                let fail_state = gr.failing_nodes.iter_mut().find(|fs| fs.name == node.name);
+            for (node, (res, time)) in poll_res {
+                let fail_state = gr
+                    .node_state
+                    .iter_mut()
+                    .find(|fs| fs.name == node.name)
+                    .expect("node");
+
+                fail_state.last_poll = Some(time);
 
                 if res.failing {
-                    if let Some(fail_state) = fail_state {
-                        if !fail_state.is_dead() {
-                            fail_state.fail_count += 1;
-                            if fail_state.is_dead() {
-                                let roll = rand::rng().random_range(0usize..usize::MAX);
-                                fail_state.local_announcement_roll = Some(roll);
-                                warn!(
-                                    "Node `{}` is dead my roll: `{}`, last fail: {:?}",
-                                    node.name, roll, fail_state.last_fail
-                                );
-                            }
+                    fail_state.last_fail = Some(time);
+
+                    if !fail_state.is_dead() {
+                        fail_state.fail_count += 1;
+                        if fail_state.is_dead() {
+                            let roll = rand::rng().random_range(0usize..usize::MAX);
+                            fail_state.local_announcement_roll = Some(roll);
+                            warn!(
+                                "Node `{}` is dead my roll: `{}`, last fail: {:?}",
+                                node.name, roll, fail_state.last_fail
+                            );
                         }
-                    } else {
-                        gr.failing_nodes
-                            .push(FailingNodeState::new_failed(node.name.clone(), time));
                     }
-                } else if let Some(fail_state) = fail_state {
+                } else {
                     // back up
                     if fail_state.is_dead() {
                         fail_state.reset();
@@ -136,7 +168,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
                 }
             }
 
-            gr.failing_nodes
+            gr.node_state
                 .iter()
                 .filter_map(|fs| fs.is_dead().then_some(fs.clone()))
                 .collect::<Vec<_>>()
@@ -152,7 +184,14 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
                     continue;
                 }
 
-                let Some(orb) = call_obituary(&client, &poller_config.name, node).await else {
+                let Some(orb) = call_obituary(
+                    &client,
+                    &poller_config.name,
+                    node,
+                    &poller_config.secret_key,
+                )
+                .await
+                else {
                     error!("Failed to call Obituary for node `{}`", node.name);
                     continue;
                 };
@@ -166,23 +205,23 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
             let mut gr = state.lock().expect("Failed to lock state");
             for (from, orb) in obi_response {
                 for dead_resp in orb.dead_nodes {
-                    if let Some(fs) = gr
-                        .failing_nodes
+                    let fs = gr
+                        .node_state
                         .iter_mut()
                         .find(|fs| fs.name == dead_resp.name && fs.is_dead())
-                    {
-                        warn!("Node `{}` is confirmed dead by `{from}`", dead_resp.name);
-                        fs.confirmations.insert(
-                            from.clone(),
-                            DeadConfirmation {
-                                confirmed_roll: Some(dead_resp.roll),
-                            },
-                        );
-                    }
+                        .expect("node");
+
+                    warn!("Node `{}` is confirmed dead by `{from}`", dead_resp.name);
+                    fs.confirmations.insert(
+                        from.clone(),
+                        DeadConfirmation {
+                            confirmed_roll: Some(dead_resp.roll),
+                        },
+                    );
                 }
 
                 // if node didnt confirm death we mark as failed confirmation of all our dead
-                for fs in gr.failing_nodes.iter_mut() {
+                for fs in gr.node_state.iter_mut() {
                     if !fs.is_dead() {
                         continue;
                     }
@@ -201,7 +240,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
             // check death quorum and rolls
             let mut announcements = vec![];
 
-            for fs in gr.failing_nodes.iter_mut() {
+            for fs in gr.node_state.iter_mut() {
                 if !fs.is_dead() {
                     continue;
                 }
@@ -377,11 +416,22 @@ async fn poll_node(client: &Client, me: &str, node: &NodeConfig) -> NodeResult {
     }
 }
 
-async fn call_obituary(client: &Client, me: &str, node: &NodeConfig) -> Option<ObituaryResponse> {
-    make_whatever_logged_http_call::<ObituaryResponse>(client, me, node, "/obituary", "obituary")
-        .await
-        .ok()
-        .flatten()
+async fn call_obituary(
+    client: &Client,
+    me: &str,
+    node: &NodeConfig,
+    key: &str,
+) -> Option<ObituaryResponse> {
+    make_whatever_logged_http_call::<ObituaryResponse>(
+        client,
+        me,
+        node,
+        &format!("/obituary/{key}"),
+        "obituary",
+    )
+    .await
+    .ok()
+    .flatten()
 }
 
 async fn announce_telegram(me: &str, dead: &NodeConfig, config: &Arc<Config>) {

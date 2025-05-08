@@ -2,9 +2,9 @@ mod poller;
 
 use crate::poller::{State, poller};
 use anyhow::{Context, Result};
-use chrono::Local;
+use chrono::{DateTime, Local, Utc};
 use env_logger::Builder;
-use log::{LevelFilter, error, info};
+use log::{LevelFilter, error, info, warn};
 use rouille::{Server, router};
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -45,6 +45,8 @@ pub struct Config {
     pub name: String,
     pub telegram_token: String,
     pub telegram_chat_id: i64,
+    pub secret_key: String,
+
     #[serde(default)]
     pub announcement_mode: AnnouncementMode,
 
@@ -77,6 +79,32 @@ pub struct DeadNodeResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ObituaryResponse {
     pub dead_nodes: Vec<DeadNodeResponse>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum GridNodeStatus {
+    Alive,
+    Dying,
+    Dead,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GridNodeResponse {
+    pub name: String,
+    pub last_poll: Option<DateTime<Utc>>,
+    pub status: GridNodeStatus,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GridResponse {
+    pub nodes: Vec<GridNodeResponse>,
+
+    // totals
+    pub alive_nodes: usize,
+    pub dead_nodes: usize,
+    pub dying_nodes: usize,
+    pub total_nodes: usize,
 }
 
 #[tokio::main]
@@ -117,6 +145,9 @@ async fn main() -> Result<()> {
         config.telegram_chat_id = i64::from_str(&chat_id)?;
     }
 
+    // filter myself out
+    config.nodes.retain(|n| n.name != config.name);
+
     let config = Arc::new(config);
 
     info!("Loaded configuration, this node is: {}", config.name);
@@ -148,11 +179,15 @@ async fn main() -> Result<()> {
                         .with_status_code(200)
                 },
 
-                (GET) (/obituary) => {
+                (GET) (/obituary/{key: String}) => {
                     info!("Called for obituary");
+                    if key != server_config.secret_key {
+                        warn!("Invalid secret key");
+                        return rouille::Response::empty_406();
+                    }
 
                     let gr = server_state.lock().expect("Failed to lock state");
-                    let dead_nodes = gr.failing_nodes.iter().filter(|fs| fs.is_dead()).map(|fs| DeadNodeResponse {
+                    let dead_nodes = gr.node_state.iter().filter(|fs| fs.is_dead()).map(|fs| DeadNodeResponse {
                         name: fs.name.clone(),
                         roll: fs.local_announcement_roll.unwrap_or(usize::MAX),
                     })
@@ -163,6 +198,50 @@ async fn main() -> Result<()> {
                     })
                         .with_status_code(200)
                 },
+
+                (GET) (/grid/{key: String}) => {
+                    info!("Called for grid");
+                    if key != server_config.secret_key {
+                        warn!("Invalid secret key");
+                        return rouille::Response::empty_406();
+                    }
+
+                    let gr = server_state.lock().expect("Failed to lock state");
+                    let mut resp = GridResponse {
+                        nodes: Default::default(),
+                        alive_nodes: 1,dead_nodes: 0,dying_nodes: 0,total_nodes: 1, // this node included
+                    };
+
+
+                    // add this node
+                    resp.nodes.push(GridNodeResponse {
+                        name: server_config.name.clone(),
+                        last_poll: None,
+                        status: GridNodeStatus::Alive,
+                    });
+
+                    for fs in gr.node_state.iter() {
+                        let node_resp = fs.to_api_response();
+                        match node_resp.status {
+                            GridNodeStatus::Alive => {
+                                resp.alive_nodes += 1;
+                            },
+                            GridNodeStatus::Dying => {
+                                resp.dying_nodes += 1;
+                            },
+                            GridNodeStatus::Dead => {
+                                resp.dead_nodes += 1;
+                            }
+                        }
+                        resp.total_nodes += 1;
+                        resp.nodes.push(node_resp);
+                    }
+                    resp.nodes.sort_by(|a, b| a.name.cmp(&b.name));
+
+                    rouille::Response::json(&resp)
+                        .with_status_code(200)
+                },
+
                 _ => rouille::Response::empty_404()
             )
         }, server_cert, key)
