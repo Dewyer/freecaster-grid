@@ -1,6 +1,7 @@
 name: Test2
 telegram_token: "test"
 telegram_chat_id: 0
+announcement_mode: log
 
 server:
   host: "localhost:4243"

@@ -1,4 +1,4 @@
-use crate::{Config, NodeConfig, ObituaryResponse, StatusResponse};
+use crate::{AnnouncementMode, Config, NodeConfig, ObituaryResponse, StatusResponse};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use log::{error, info, warn};
@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 const DEAD_AFTER: usize = 3;
+const POLL_INTERVAL: Duration = Duration::from_secs(3);
 
 pub struct StateInner {
     pub failing_nodes: Vec<FailingNodeState>,
@@ -88,6 +89,13 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
 
     loop {
         let time = Utc::now();
+
+        let has_net = check_internet_connection().await;
+        if !has_net {
+            warn!("No internet connection, skipping poll");
+            tokio::time::sleep(POLL_INTERVAL).await;
+            continue;
+        }
 
         info!("Polling nodes @`{time:?}`");
         let mut poll_res = HashMap::new();
@@ -209,23 +217,33 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
                     .confirmations
                     .iter()
                     .filter(|(_, val)| val.confirmed_roll.is_some())
-                    .count();
+                    .count()
+                    + 1; // plus me
                 let false_confirmations = fs
                     .confirmations
                     .iter()
                     .filter(|(_, val)| val.confirmed_roll.is_none())
                     .count();
-                if true_confirmations > false_confirmations {
-                    warn!("Node `{}` is confirmed dead by quorum", fs.name);
+                info!(
+                    "Death consideration votes: `{true_confirmations}` dead, `{false_confirmations}` live"
+                );
+                info!("Rolls: {:#?} (my roll: {})", fs.confirmations, my_roll);
+
+                if true_confirmations <= false_confirmations {
+                    info!("Node `{}`'s death is not confirmed by quorum", fs.name);
+                    continue;
                 }
 
+                warn!("Node `{}` is confirmed dead by quorum", fs.name);
                 let mut confirmations_rolls = fs
                     .confirmations
                     .iter()
                     .filter_map(|(from, val)| val.confirmed_roll.map(|roll| (from.clone(), roll)))
                     .collect::<Vec<_>>();
                 confirmations_rolls.push((poller_config.name.clone(), my_roll));
-                confirmations_rolls.sort_by_key(|(_, roll)| *roll);
+                confirmations_rolls.sort_by(|(name1, roll1), (name2, roll2)| {
+                    roll1.cmp(roll2).then_with(|| name1.cmp(name2))
+                });
 
                 let winner = confirmations_rolls.last().expect("no confirmations?");
                 if winner.0 == poller_config.name {
@@ -239,7 +257,13 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
                         .find(|n| n.name == fs.name)
                         .expect("node");
                     announcements.push(node.clone());
+                } else {
+                    warn!(
+                        "Node `{}`'s death to be announced by `{}` death rolled: {}",
+                        fs.name, winner.0, winner.1
+                    );
                 }
+
                 fs.announced = true; // announced death
             }
 
@@ -247,15 +271,29 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
         };
 
         for anc in announcements {
-            announce_death_telegram(&poller_config.name, &anc, &poller_config).await;
+            match poller_config.announcement_mode {
+                AnnouncementMode::Telegram => {
+                    announce_telegram(&poller_config.name, &anc, &poller_config).await;
+                }
+                AnnouncementMode::Log => {
+                    error!("Announcement!!!: `{}` is dead.", anc.name);
+                }
+            }
         }
 
-        tokio::time::sleep(Duration::from_secs(5)).await;
+        tokio::time::sleep(POLL_INTERVAL).await;
     }
 }
 
 struct NodeResult {
     failing: bool,
+}
+
+async fn check_internet_connection() -> bool {
+    let Ok(resp) = reqwest::get("http://clients3.google.com/generate_204").await else {
+        return false;
+    };
+    resp.status() == reqwest::StatusCode::NO_CONTENT
 }
 
 async fn make_whatever_logged_http_call<T: DeserializeOwned>(
@@ -346,7 +384,7 @@ async fn call_obituary(client: &Client, me: &str, node: &NodeConfig) -> Option<O
         .flatten()
 }
 
-async fn announce_death_telegram(me: &str, dead: &NodeConfig, config: &Arc<Config>) {
+async fn announce_telegram(me: &str, dead: &NodeConfig, config: &Arc<Config>) {
     let end = if let Some(tg) = dead.telegram_handle.as_ref() {
         format!("- @{tg}")
     } else {

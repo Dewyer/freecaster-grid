@@ -32,11 +32,21 @@ pub struct NodeConfig {
     pub address: String,
 }
 
+#[derive(Debug, Deserialize, Default, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AnnouncementMode {
+    #[default]
+    Telegram,
+    Log,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub name: String,
     pub telegram_token: String,
     pub telegram_chat_id: i64,
+    #[serde(default)]
+    pub announcement_mode: AnnouncementMode,
 
     pub server: ServerConfig,
 
