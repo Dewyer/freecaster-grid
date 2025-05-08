@@ -1,0 +1,25 @@
+services:
+  freecaster-grid-1:
+    image: freecaster-grid
+    build: .
+    restart: on-failure:3
+    volumes:
+      - ./config.test.yaml:/config/config.yaml
+      - ./keys:/keys
+    network_mode: "host"
+  freecaster-grid-2:
+    image: freecaster-grid
+    build: .
+    restart: on-failure:3
+    volumes:
+      - ./config.test2.yaml:/config/config.yaml
+      - ./keys:/keys
+    network_mode: "host"
+  freecaster-grid-3:
+    image: freecaster-grid
+    build: .
+    restart: on-failure:3
+    volumes:
+      - ./config.test3.yaml:/config/config.yaml
+      - ./keys:/keys
+    network_mode: "host"
