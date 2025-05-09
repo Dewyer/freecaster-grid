@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 const DEAD_AFTER: usize = 3;
-const POLL_INTERVAL: Duration = Duration::from_secs(3);
+const POLL_INTERVAL: Duration = Duration::from_secs(10);
 
 pub struct StateInner {
     pub node_state: Vec<NodeState>,

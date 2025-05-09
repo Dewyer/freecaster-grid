@@ -3,3 +3,5 @@
 keys/**
 
 .env
+
+config.prod.yaml
