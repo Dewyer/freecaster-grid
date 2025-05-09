@@ -19,8 +19,6 @@ RUN cargo build --release --bin freecaster-grid --target x86_64-unknown-linux-mu
 FROM alpine:3.21.3 AS runtime
 RUN apk add --no-cache \
     ca-certificates \
-    openssl \
-    libssl3 \
     && rm -rf /var/cache/apk/*
 
 COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/freecaster-grid /usr/local/bin/
