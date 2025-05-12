@@ -1,11 +1,12 @@
 mod poller;
 
-use crate::poller::{State, poller};
+use crate::poller::{NodeSilence, State, poller};
 use anyhow::{Context, Result};
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Local, SubsecRound, Utc};
 use env_logger::Builder;
 use log::{LevelFilter, error, info, warn};
-use rouille::{Server, router};
+use rand::Rng;
+use rouille::{Server, router, try_or_400};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::io::Write;
@@ -107,6 +108,19 @@ pub struct GridResponse {
     pub total_nodes: usize,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SilenceResponse {
+    pub name: String,
+    pub silent_until: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SilenceBroadcastRequest {
+    pub id: usize,
+    pub node_name: String,
+    pub silent_until: DateTime<Utc>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
@@ -199,6 +213,62 @@ async fn main() -> Result<()> {
                         .with_status_code(200)
                 },
 
+                (POST) (/silence-broadcast/{key: String}) => {
+                    info!("Called for silence broadcast");
+                    if key != server_config.secret_key {
+                        warn!("Invalid secret key");
+                        return rouille::Response::empty_406();
+                    }
+
+                    let body: SilenceBroadcastRequest = try_or_400!(rouille::input::json_input(request));
+                    let mut gr = server_state.lock().expect("Failed to lock state");
+                    let found = gr.silences.iter().any(|sl| sl.id == body.id);
+                    if found {
+                        warn!("Silence already exists");
+                        return rouille::Response::empty_204();
+                    }
+
+                    // add otherwise
+                    gr.silences.push(NodeSilence {
+                        id: body.id,
+                        node_name: body.node_name,
+                        silent_until: body.silent_until,
+                        broadcasted: true,
+                    });
+                    rouille::Response::empty_204()
+                },
+
+                (GET) (/silence/{key: String}/{time: String}) => {
+                    info!("Called for silence");
+                    if key != server_config.secret_key {
+                        warn!("Invalid secret key");
+                        return rouille::Response::empty_406();
+                    }
+
+                    let mut gr = server_state.lock().expect("Failed to lock state");
+                    let id = rand::rng().random_range(0usize..usize::MAX);
+
+                    let Some(silent_until) = try_parse_until_time(&time) else {
+                        return rouille::Response::empty_400();
+                    };
+
+                    let resp = SilenceResponse {
+                        name: server_config.name.clone(),
+                        silent_until,
+                    };
+
+                    gr.silences.push(NodeSilence {
+                        id,
+                        node_name: server_config.name.clone(),
+                        silent_until,
+                        broadcasted: false,
+                    });
+                    info!("Added silence for {} until `{}`", server_config.name, silent_until);
+
+                    rouille::Response::json(&resp)
+                        .with_status_code(200)
+                },
+
                 (GET) (/grid/{key: String}) => {
                     info!("Called for grid");
                     if key != server_config.secret_key {
@@ -259,4 +329,16 @@ async fn main() -> Result<()> {
 
     js.join_all().await;
     Ok(())
+}
+
+fn try_parse_until_time(time: &str) -> Option<DateTime<Utc>> {
+    // try to parse as time, otherwise its duration
+    if let Ok(time) = i64::from_str(time) {
+        if let Some(time) = DateTime::<Utc>::from_timestamp(time, 0) {
+            return Some(time);
+        }
+    }
+
+    let duration = humantime::parse_duration(time).ok()?;
+    Some(Utc::now().trunc_subsecs(0) + duration)
 }

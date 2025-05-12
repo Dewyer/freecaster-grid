@@ -1,6 +1,6 @@
 use crate::{
     AnnouncementMode, Config, GridNodeResponse, GridNodeStatus, NodeConfig, ObituaryResponse,
-    StatusResponse,
+    SilenceBroadcastRequest, StatusResponse,
 };
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -18,6 +18,7 @@ const POLL_INTERVAL: Duration = Duration::from_secs(10);
 
 pub struct StateInner {
     pub node_state: Vec<NodeState>,
+    pub silences: Vec<NodeSilence>,
 }
 
 #[derive(Clone)]
@@ -33,8 +34,19 @@ impl Deref for State {
 
 impl State {
     pub fn new() -> Self {
-        Self(Arc::new(Mutex::new(StateInner { node_state: vec![] })))
+        Self(Arc::new(Mutex::new(StateInner {
+            node_state: vec![],
+            silences: vec![],
+        })))
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct NodeSilence {
+    pub id: usize,
+    pub node_name: String,
+    pub silent_until: DateTime<Utc>,
+    pub broadcasted: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -125,9 +137,61 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
             continue;
         }
 
+        // process silences
+        let silenced_nodes_clone = {
+            let mut gr = state.lock().expect("Failed to lock state");
+            // expire silences
+            gr.silences.retain(|sl| sl.silent_until > time);
+
+            gr.silences.clone()
+        };
+
+        // broadcast silences
+        let mut broadcast_silences = vec![];
+        for sl in silenced_nodes_clone.iter() {
+            if sl.broadcasted {
+                continue;
+            }
+
+            // broadcast
+            for node in poller_config.nodes.iter() {
+                let done = call_silence_broadcast(
+                    &client,
+                    &poller_config.name,
+                    node,
+                    &poller_config.secret_key,
+                    sl,
+                )
+                .await;
+
+                if done {
+                    broadcast_silences.push(sl.clone());
+                    break;
+                }
+            }
+        }
+
+        // set broadcast state
+        {
+            let mut gr = state.lock().expect("Failed to lock state");
+            for sl in gr.silences.iter_mut() {
+                if broadcast_silences.iter().any(|bs| bs.id == sl.id) {
+                    sl.broadcasted = true;
+                }
+            }
+        }
+
         info!("Polling nodes @`{time:?}`");
         let mut poll_res = HashMap::new();
         for node in poller_config.nodes.iter() {
+            if silenced_nodes_clone
+                .iter()
+                .any(|sl| sl.node_name == node.name)
+            {
+                info!("Silenced node {}", node.name);
+                continue;
+            }
+
             info!("Checking node {}: {}", node.name, node.address);
             let time = Utc::now();
             let res = poll_node(&client, &poller_config.name, node).await;
@@ -432,6 +496,40 @@ async fn call_obituary(
     .await
     .ok()
     .flatten()
+}
+
+async fn call_silence_broadcast(
+    client: &Client,
+    me: &str,
+    node: &NodeConfig,
+    key: &str,
+    silence: &NodeSilence,
+) -> bool {
+    info!(
+        "Broadcasting silence {}: {}, to node `{}`",
+        silence.id, silence.silent_until, node.name
+    );
+    let res = client
+        .post(format!("{}/silence-broadcast/{key}", node.address))
+        .json(&SilenceBroadcastRequest {
+            id: silence.id,
+            node_name: silence.node_name.clone(),
+            silent_until: silence.silent_until,
+        })
+        .header(
+            "User-Agent",
+            format!("freecaster-grid/{}/{}", env!("CARGO_PKG_VERSION"), me,),
+        )
+        .timeout(Duration::from_secs(5))
+        .send()
+        .await;
+
+    let Ok(res) = res else {
+        error!("Failed to connect to node {}: {:?}", node.name, res);
+        return false;
+    };
+
+    res.status().is_success()
 }
 
 async fn announce_telegram(me: &str, dead: &NodeConfig, config: &Arc<Config>) {
