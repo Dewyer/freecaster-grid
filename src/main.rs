@@ -48,6 +48,9 @@ pub struct Config {
     pub telegram_token: String,
     pub telegram_chat_id: i64,
     pub secret_key: String,
+    #[serde(default)]
+    #[serde(with = "humantime_serde")]
+    pub poll_time: Option<std::time::Duration>,
 
     #[serde(default)]
     pub announcement_mode: AnnouncementMode,

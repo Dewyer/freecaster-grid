@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 const DEAD_AFTER: usize = 3;
-const POLL_INTERVAL: Duration = Duration::from_secs(10);
+const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(10);
 
 pub struct StateInner {
     pub node_state: Vec<NodeState>,
@@ -133,7 +133,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
         let has_net = check_internet_connection().await;
         if !has_net {
             warn!("No internet connection, skipping poll");
-            tokio::time::sleep(POLL_INTERVAL).await;
+            tokio::time::sleep(DEFAULT_POLL_INTERVAL).await;
             continue;
         }
 
@@ -384,7 +384,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
             }
         }
 
-        tokio::time::sleep(POLL_INTERVAL).await;
+        tokio::time::sleep(poller_config.poll_time.unwrap_or(DEFAULT_POLL_INTERVAL)).await;
     }
 }
 
