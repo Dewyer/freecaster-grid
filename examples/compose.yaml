@@ -1,10 +1,10 @@
 services:
-  freecaster-grid-1:
-    image: freecaster-grid
-    container: freecaster-grid
-    restart: on-failure:3
+  freecaster-grid:
+    image: ghcr.io/dewyer/freecaster-grid:latest
+    container_name: freecaster-grid
+    restart: unless-stopped
     volumes:
       - /path/to/config:/config/config.yaml
       - /path/to/keys:/keys
-    porst:
+    ports:
       - 4242:4242

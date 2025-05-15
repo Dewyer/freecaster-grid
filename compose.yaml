@@ -15,6 +15,9 @@ services:
       - ./config.test2.yaml:/config/config.yaml
       - ./keys:/keys
     network_mode: "host"
+    environment:
+      - PUID=13000
+      - PGID=13000
   freecaster-grid-3:
     image: freecaster-grid
     build: .
@@ -23,3 +26,6 @@ services:
       - ./config.test3.yaml:/config/config.yaml
       - ./keys:/keys
     network_mode: "host"
+    environment:
+      - PUID=13000
+      - PUID=13000
