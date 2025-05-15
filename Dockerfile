@@ -17,14 +17,17 @@ COPY . .
 RUN cargo build --release --bin freecaster-grid --target x86_64-unknown-linux-musl
 
 FROM alpine:3.21.3 AS runtime
+
 RUN apk add --no-cache \
     ca-certificates \
+    su-exec \
     && rm -rf /var/cache/apk/*
 
 COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/freecaster-grid /usr/local/bin/
 RUN chmod +x /usr/local/bin/freecaster-grid
 
-RUN addgroup -S -g 1000 appgroup && adduser -S -u 1000 appuser -G appgroup
-USER appuser
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-ENTRYPOINT ["/usr/local/bin/freecaster-grid", "/config/config.yaml"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["/usr/local/bin/freecaster-grid", "/config/config.yaml"]
