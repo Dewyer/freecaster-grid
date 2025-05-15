@@ -6,7 +6,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use log::{error, info, warn};
 use rand::Rng;
-use reqwest::Client;
+use reqwest::{Certificate, Client};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -63,7 +63,7 @@ pub struct NodeState {
     pub confirmations: HashMap<String, DeadConfirmation>,
     pub announcement_rolls: HashMap<String, usize>,
     pub local_announcement_roll: Option<usize>,
-    pub announced: bool,
+    pub announced: Option<String>,
 }
 
 impl NodeState {
@@ -76,7 +76,7 @@ impl NodeState {
             confirmations: Default::default(),
             announcement_rolls: Default::default(),
             local_announcement_roll: None,
-            announced: false,
+            announced: None,
         }
     }
 
@@ -90,11 +90,11 @@ impl NodeState {
         self.announcement_rolls.clear();
         self.local_announcement_roll = None;
         self.last_fail = None;
-        self.announced = false;
+        self.announced = None;
     }
 
     pub fn to_api_response(&self) -> GridNodeResponse {
-        let status = if self.is_dead() && self.announced {
+        let status = if self.is_dead() && self.announced.is_some() {
             GridNodeStatus::Dead
         } else if self.is_dead() {
             GridNodeStatus::Dying
@@ -110,14 +110,16 @@ impl NodeState {
     }
 }
 
-pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Result<()> {
+pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: State) -> Result<()> {
     info!("Starting poller `{}`", poller_config.name);
 
-    let client = Client::builder()
-        .use_rustls_tls()
-        .add_root_certificate(reqwest::Certificate::from_pem(cert)?)
-        .danger_accept_invalid_certs(true)
-        .build()?;
+    let mut client = Client::builder().use_rustls_tls();
+
+    if let Some(cert) = cert {
+        client = client.add_root_certificate(Certificate::from_pem(&cert)?);
+    }
+
+    let client = client.danger_accept_invalid_certs(true).build()?;
 
     // init state
     {
@@ -198,6 +200,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
             poll_res.insert(node.clone(), (res, time));
         }
 
+        let mut up_announcements = vec![];
         let dead_copies = {
             let mut gr = state.lock().expect("Failed to lock state");
             for (node, (res, time)) in poll_res {
@@ -226,6 +229,9 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
                 } else {
                     // back up
                     if fail_state.is_dead() {
+                        if fail_state.announced == Some(poller_config.name.clone()) {
+                            up_announcements.push(node.clone());
+                        }
                         fail_state.reset();
                         info!("Node `{}` is back up", node.name);
                     }
@@ -238,11 +244,26 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
                 .collect::<Vec<_>>()
         };
 
+        // announce up
+        for up in up_announcements {
+            match poller_config.announcement_mode {
+                AnnouncementMode::Telegram => {
+                    announce_telegram(&poller_config.name, &up, &poller_config, false).await;
+                }
+                AnnouncementMode::Log => {
+                    error!("Announcement!!!: `{}` is back.", up.name);
+                }
+            }
+        }
+
         // check deaths
         let mut obi_response = HashMap::new();
 
         // any dead nodes need announcement
-        if dead_copies.iter().any(|fs| fs.is_dead() && !fs.announced) {
+        if dead_copies
+            .iter()
+            .any(|fs| fs.is_dead() && fs.announced.is_none())
+        {
             for node in poller_config.nodes.iter() {
                 if dead_copies.iter().any(|fs| fs.name == node.name) {
                     continue;
@@ -308,7 +329,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
                 if !fs.is_dead() {
                     continue;
                 }
-                if fs.announced {
+                if fs.announced.is_some() {
                     continue;
                 }
 
@@ -367,7 +388,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
                     );
                 }
 
-                fs.announced = true; // announced death
+                fs.announced = Some(winner.0.clone()); // announced death
             }
 
             announcements
@@ -376,7 +397,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: &[u8], state: State) -> Re
         for anc in announcements {
             match poller_config.announcement_mode {
                 AnnouncementMode::Telegram => {
-                    announce_telegram(&poller_config.name, &anc, &poller_config).await;
+                    announce_telegram(&poller_config.name, &anc, &poller_config, true).await;
                 }
                 AnnouncementMode::Log => {
                     error!("Announcement!!!: `{}` is dead.", anc.name);
@@ -532,18 +553,25 @@ async fn call_silence_broadcast(
     res.status().is_success()
 }
 
-async fn announce_telegram(me: &str, dead: &NodeConfig, config: &Arc<Config>) {
-    let end = if let Some(tg) = dead.telegram_handle.as_ref() {
+async fn announce_telegram(me: &str, target: &NodeConfig, config: &Arc<Config>, is_dead: bool) {
+    let end = if let Some(tg) = target.telegram_handle.as_ref() {
         format!("- @{tg}")
     } else {
         "".to_string()
     };
 
     let res = telegram_notifyrs::send_message(
-        format!(
-            "Grid announcement, `{}` has unfortunately died, announced by: `{me}`{end}",
-            dead.name
-        ),
+        if is_dead {
+            format!(
+                "Grid announcement, `{}` has unfortunately died, announced by: `{me}`{end}",
+                target.name
+            )
+        } else {
+            format!(
+                "Grid announcement, `{}` has fortunately RETURNED, announced by: `{me}`{end}",
+                target.name
+            )
+        },
         &config.telegram_token,
         config.telegram_chat_id,
     );

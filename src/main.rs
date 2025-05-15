@@ -22,8 +22,10 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub struct ServerConfig {
     pub host: String,
     pub ssl: bool,
-    pub cert_path: String,
-    pub key_path: String,
+    #[serde(default)]
+    pub cert_path: Option<String>,
+    #[serde(default)]
+    pub key_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone, Serialize)]
@@ -169,16 +171,32 @@ async fn main() -> Result<()> {
     let config = Arc::new(config);
 
     info!("Loaded configuration, this node is: {}", config.name);
-    let cert = fs::read(&config.server.cert_path)
-        .await
-        .with_context(|| "Failed to read certificate")?;
-    let key = fs::read(&config.server.key_path)
-        .await
-        .with_context(|| "Failed to read key")?;
+
+    let cert = if let Some(cert_path) = &config.server.cert_path {
+        info!("Using certificate from {cert_path:?}");
+        Some(
+            fs::read(cert_path)
+                .await
+                .with_context(|| "Failed to read certificate")?,
+        )
+    } else {
+        None
+    };
+
+    let key = if let Some(key_path) = &config.server.key_path {
+        info!("Using kery from {key_path:?}");
+        Some(
+            fs::read(key_path)
+                .await
+                .with_context(|| "Failed to read key")?,
+        )
+    } else {
+        None
+    };
 
     let mut js = JoinSet::new();
     let server_config = config.clone();
-    let server_cert = cert.clone();
+    let poller_cert = cert.clone();
     let state = State::new();
     let server_state = state.clone();
 
@@ -191,7 +209,8 @@ async fn main() -> Result<()> {
         let router = move |request: &Request| {
             router!(request,
                 (GET) (/) => {
-                    info!("Called for status");
+                    let user_agent = request.header("User-Agent").unwrap_or("Unknown");
+                    info!("Called for status ua: `{user_agent}`");
 
                     rouille::Response::json(&StatusResponse {
                         name: server_config.name.clone(),
@@ -325,9 +344,13 @@ async fn main() -> Result<()> {
 
         if ssl {
             info!("Starting server with SSL");
-            Server::new_ssl(host, router , server_cert, key)
-                .expect("Failed to start server")
-                .run()
+            if let (Some(cert), Some(key)) = (cert, key) {
+                Server::new_ssl(host, router , cert, key)
+                    .expect("Failed to start server")
+                    .run()
+            } else {
+                error!("No certificate or key provided in SSL mode, aborting");
+            }
         } else {
             info!("Starting server without SSL");
             Server::new(host, router)
@@ -338,8 +361,9 @@ async fn main() -> Result<()> {
 
     let poller_config = config.clone();
     let poller_state = state.clone();
+
     js.spawn(async move {
-        poller(poller_config, &cert, poller_state)
+        poller(poller_config, poller_cert, poller_state)
             .await
             .expect("Poller failed");
     });
