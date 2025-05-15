@@ -6,7 +6,7 @@ use chrono::{DateTime, Local, SubsecRound, Utc};
 use env_logger::Builder;
 use log::{LevelFilter, error, info, warn};
 use rand::Rng;
-use rouille::{Server, router, try_or_400};
+use rouille::{Request, Server, router, try_or_400};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::io::Write;
@@ -21,6 +21,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Debug, Deserialize)]
 pub struct ServerConfig {
     pub host: String,
+    pub ssl: bool,
     pub cert_path: String,
     pub key_path: String,
 }
@@ -181,7 +182,10 @@ async fn main() -> Result<()> {
     js.spawn(async move {
         info!("Starting server `{}`", server_config.server.host);
 
-        Server::new_ssl(server_config.server.host.clone(), move |request| {
+        let host = server_config.server.host.clone();
+        let ssl = server_config.server.ssl;
+
+        let router = move |request: &Request| {
             router!(request,
                 (GET) (/) => {
                     info!("Called for status");
@@ -314,9 +318,19 @@ async fn main() -> Result<()> {
 
                 _ => rouille::Response::empty_404()
             )
-        }, server_cert, key)
-            .expect("Failed to start server")
-            .run()
+        };
+
+        if ssl {
+            info!("Starting server with SSL");
+            Server::new_ssl(host, router , server_cert, key)
+                .expect("Failed to start server")
+                .run()
+        } else {
+            info!("Starting server without SSL");
+            Server::new(host, router)
+                .expect("Failed to start server")
+                .run()
+        }
     });
 
     let poller_config = config.clone();
