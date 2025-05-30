@@ -372,6 +372,11 @@ fn handle_silence(
 
     let target = target.unwrap_or_else(|| server_config.name.clone());
 
+    // check if target is valid
+    if !gr.node_state.iter().any(|fs| fs.name == target) && target != server_config.name {
+        return rouille::Response::empty_404();
+    }
+
     let resp = SilenceResponse {
         name: target.clone(),
         silent_until,
