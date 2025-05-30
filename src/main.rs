@@ -266,33 +266,12 @@ async fn main() -> Result<()> {
 
                 (GET) (/silence/{key: String}/{time: String}) => {
                     info!("Called for silence");
-                    if key != server_config.secret_key {
-                        warn!("Invalid secret key");
-                        return rouille::Response::empty_406();
-                    }
+                    handle_silence(&server_config, &server_state, key, time, None)
+                },
 
-                    let mut gr = server_state.lock().expect("Failed to lock state");
-                    let id = rand::rng().random_range(0usize..usize::MAX);
-
-                    let Some(silent_until) = try_parse_until_time(&time) else {
-                        return rouille::Response::empty_400();
-                    };
-
-                    let resp = SilenceResponse {
-                        name: server_config.name.clone(),
-                        silent_until,
-                    };
-
-                    gr.silences.push(NodeSilence {
-                        id,
-                        node_name: server_config.name.clone(),
-                        silent_until,
-                        broadcasted: false,
-                    });
-                    info!("Added silence for {} until `{}`", server_config.name, silent_until);
-
-                    rouille::Response::json(&resp)
-                        .with_status_code(200)
+                (GET) (/silence/{key: String}/{time: String}/{target: String}) => {
+                    info!("Called for silence");
+                    handle_silence(&server_config, &server_state, key, time, Some(target))
                 },
 
                 (GET) (/grid/{key: String}) => {
@@ -370,6 +349,44 @@ async fn main() -> Result<()> {
 
     js.join_all().await;
     Ok(())
+}
+
+fn handle_silence(
+    server_config: &Config,
+    server_state: &State,
+    key: String,
+    time: String,
+    target: Option<String>,
+) -> rouille::Response {
+    if key != server_config.secret_key {
+        warn!("Invalid secret key");
+        return rouille::Response::empty_406();
+    }
+
+    let mut gr = server_state.lock().expect("Failed to lock state");
+    let id = rand::rng().random_range(0usize..usize::MAX);
+
+    let Some(silent_until) = try_parse_until_time(&time) else {
+        return rouille::Response::empty_400();
+    };
+
+    let target = target.unwrap_or_else(|| server_config.name.clone());
+
+    let resp = SilenceResponse {
+        name: target.clone(),
+        silent_until,
+    };
+
+    gr.silences.push(NodeSilence {
+        id,
+        node_name: target.clone(),
+        silent_until,
+        broadcasted: false,
+    });
+    info!("Added silence for {} until `{}`", target, silent_until);
+
+    rouille::Response::json(&resp)
+        .with_status_code(200)
 }
 
 fn try_parse_until_time(time: &str) -> Option<DateTime<Utc>> {
