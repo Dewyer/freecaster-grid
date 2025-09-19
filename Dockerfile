@@ -14,7 +14,8 @@ COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --target $(uname -p)-unknown-linux-musl --recipe-path recipe.json
 # Build application
 COPY . .
-RUN cargo build --release --bin freecaster-grid --target $(uname -p)-unknown-linux-musl
+RUN cargo build --release --bin freecaster-grid --target $(uname -p)-unknown-linux-musl && \
+    mv target/$(uname -p)-unknown-linux-musl/release/freecaster-grid freecaster-grid
 
 FROM alpine:3.21.3 AS runtime
 
@@ -23,7 +24,7 @@ RUN apk add --no-cache \
     su-exec \
     && rm -rf /var/cache/apk/*
 
-COPY --from=builder /app/target/$(uname -p)-unknown-linux-musl/release/freecaster-grid /usr/local/bin/
+COPY --from=builder /app/freecaster-grid /usr/local/bin/
 RUN chmod +x /usr/local/bin/freecaster-grid
 
 COPY docker-entrypoint.sh /usr/local/bin/
