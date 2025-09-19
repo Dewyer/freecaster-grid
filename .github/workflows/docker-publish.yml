@@ -18,8 +18,6 @@ jobs:
             name: AMD64
           - builder: ubuntu-24.04-arm
             name: ARM64
-        
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
