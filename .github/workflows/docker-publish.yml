@@ -6,18 +6,11 @@ on:
 
 jobs:
   build-and-push:
-    name: Build and push Docker image on ${{ matrix.name }}
-    runs-on: ${{ matrix.builder }}
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    strategy:
-      matrix:
-        include:
-          - builder: ubuntu-latest
-            name: AMD64
-          - builder: ubuntu-24.04-arm
-            name: ARM64
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -40,3 +33,4 @@ jobs:
           tags: ghcr.io/dewyer/freecaster-grid:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
