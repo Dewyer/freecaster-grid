@@ -87,7 +87,7 @@ jobs:
         with:
           images: ghcr.io/dewyer/freecaster-grid
           tags: |
-            type=raw,value=latest,enabled=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=ref,event=pr
           labels: |
             org.opencontainers.image.source=${{ github.repository }}
@@ -101,7 +101,7 @@ jobs:
           images: ghcr.io/dewyer/freecaster-grid
           flavor: suffix=-x86_64
           tags: |
-            type=raw,value=latest,enabled=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=ref,event=pr
 
       - name: Metadata for arm64
@@ -111,7 +111,7 @@ jobs:
           images: ghcr.io/dewyer/freecaster-grid
           flavor: suffix=-arm64
           tags: |
-            type=raw,value=latest,enabled=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=ref,event=pr
           
       - name: Convert multi-arch tags from newline to comma separated
