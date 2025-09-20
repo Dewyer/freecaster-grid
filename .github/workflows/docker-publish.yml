@@ -41,7 +41,7 @@ jobs:
           flavor:
             suffix=-${{ matrix.arch }},onlatest=true
           tags: |
-            type=raw,value=latest,enabled=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=ref,event=pr
           labels: |
             org.opencontainers.image.source=${{ github.repository }}
