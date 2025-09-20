@@ -67,7 +67,7 @@ async fn load_config(path: PathBuf) -> Result<Config> {
     info!("Loading config from {path:?}");
 
     let config_str = fs::read_to_string(path).await?;
-    let config: Config = serde_yml::from_str(&config_str)?;
+    let config: Config = serde_norway::from_str(&config_str)?;
     Ok(config)
 }
 
@@ -390,16 +390,15 @@ fn handle_silence(
     });
     info!("Added silence for {} until `{}`", target, silent_until);
 
-    rouille::Response::json(&resp)
-        .with_status_code(200)
+    rouille::Response::json(&resp).with_status_code(200)
 }
 
 fn try_parse_until_time(time: &str) -> Option<DateTime<Utc>> {
     // try to parse as time, otherwise its duration
-    if let Ok(time) = i64::from_str(time) {
-        if let Some(time) = DateTime::<Utc>::from_timestamp(time, 0) {
-            return Some(time);
-        }
+    if let Ok(time) = i64::from_str(time)
+        && let Some(time) = DateTime::<Utc>::from_timestamp(time, 0)
+    {
+        return Some(time);
     }
 
     let duration = humantime::parse_duration(time).ok()?;
