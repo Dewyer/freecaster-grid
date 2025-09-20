@@ -1,1 +1,5 @@
 target
+Dockerfile
+*.yaml
+*.yml
+.env
