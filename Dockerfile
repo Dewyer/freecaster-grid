@@ -1,6 +1,7 @@
 FROM clux/muslrust:stable AS chef
 USER root
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | sh
+ADD rust-toolchain.toml .
 RUN rustup target add $(uname -p)-unknown-linux-musl
 RUN cargo binstall cargo-chef -y
 WORKDIR /app
