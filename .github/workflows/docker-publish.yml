@@ -11,8 +11,6 @@ jobs:
   build-and-push:
     name: Build and push Docker image on ${{ matrix.arch }}
     runs-on: ubuntu-${{ matrix.ubuntu-flavor }}
-    outputs:
-      tags: ${{ steps.meta.outputs.tags }}
     permissions:
       contents: read
       packages: write
@@ -94,9 +92,31 @@ jobs:
             org.opencontainers.image.url=https://github.com/dewyer/freecaster-grid
             org.opencontainers.image.revision=${{ github.sha }}
 
+      - name: Metadata for x86_64
+        id: meta-x86_64
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/dewyer/freecaster-grid
+          flavor: suffix=-x86_64
+          tags: |
+            type=raw,value=latest,enabled=${{ github.ref == 'refs/heads/main' }}
+            type=ref,event=pr
+
+      - name: Metadata for arm64
+        id: meta-arm64
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/dewyer/freecaster-grid
+          flavor: suffix=-arm64
+          tags: |
+            type=raw,value=latest,enabled=${{ github.ref == 'refs/heads/main' }}
+            type=ref,event=pr
+
       - name: Create and push manifest list
         uses: Noelware/docker-manifest-action@1.0.0
         with:
           inputs: ${{ steps.meta.outputs.tags }}
-          tags: ${{ needs.build-and-push.outputs.tags }}
+          tags: |
+            ${{ steps.meta-x86_64.outputs.tags }}
+            ${{ steps.meta-arm64.outputs.tags }}
           push: true
