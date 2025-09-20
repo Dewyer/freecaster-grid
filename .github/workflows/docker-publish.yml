@@ -123,8 +123,8 @@ jobs:
       - name: Create and push manifest list
         uses: Noelware/docker-manifest-action@1.0.0
         with:
-          inputs: ${{ steps.meta.outputs.tags }}
-          tags: ${{ steps.multiarch-tags.outputs.tags }}
+          tags: ${{ steps.meta.outputs.tags }}
+          inputs: ${{ steps.multiarch-tags.outputs.tags }}
           push: true
   
   comment-pr:
