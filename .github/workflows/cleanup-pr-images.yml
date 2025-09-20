@@ -1,0 +1,108 @@
+name: Cleanup PR images
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    types: [closed]
+
+jobs:
+  cleanup-pr-images:
+    name: Cleanup GHCR images for merged PR
+    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.merged == true }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Delete GHCR tags for this PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const pkgType = 'container';
+            const pkgName = 'freecaster-grid';
+            const prNumber = context.payload.pull_request?.number;
+            if (!prNumber) {
+              core.info('No PR number found; skipping cleanup');
+              return;
+            }
+
+            const tagTargets = [
+              `pr-${prNumber}`,
+              `pr-${prNumber}-x86_64`,
+              `pr-${prNumber}-arm64`
+            ];
+
+            core.info(`Looking for package versions with tags: ${tagTargets.join(', ')}`);
+
+            // Determine if repository owner is an Organization or a User
+            const ownerType = context.payload.repository?.owner?.type || 'User';
+            core.info(`Detected owner '${owner}' type: ${ownerType}`);
+
+            async function listVersions() {
+              if (ownerType === 'Organization') {
+                return await github.paginate(
+                  github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg,
+                  {
+                    org: owner,
+                    package_type: pkgType,
+                    package_name: pkgName,
+                    per_page: 100
+                  }
+                );
+              } else {
+                return await github.paginate(
+                  github.rest.packages.getAllPackageVersionsForPackageOwnedByUser,
+                  {
+                    username: owner,
+                    package_type: pkgType,
+                    package_name: pkgName,
+                    per_page: 100
+                  }
+                );
+              }
+            }
+
+            async function deleteVersion(id) {
+              if (ownerType === 'Organization') {
+                return await github.rest.packages.deletePackageVersionForOrg({
+                  org: owner,
+                  package_type: pkgType,
+                  package_name: pkgName,
+                  package_version_id: id
+                });
+              } else {
+                return await github.rest.packages.deletePackageVersionForUser({
+                  username: owner,
+                  package_type: pkgType,
+                  package_name: pkgName,
+                  package_version_id: id
+                });
+              }
+            }
+
+            const versions = await listVersions();
+
+            const matches = [];
+            for (const v of versions) {
+              const tags = v?.metadata?.container?.tags ?? [];
+              if (tags.some(t => tagTargets.includes(t))) {
+                matches.push({ id: v.id, name: v.name, tags });
+              }
+            }
+
+            if (matches.length === 0) {
+              core.info('No matching package versions found to delete.');
+              return;
+            }
+
+            core.info(`Found ${matches.length} package versions to delete.`);
+
+            for (const m of matches) {
+              try {
+                core.info(`Deleting version id=${m.id} tags=[${m.tags.join(', ')}]`);
+                await deleteVersion(m.id);
+              } catch (err) {
+                core.warning(`Failed to delete version id=${m.id}: ${err.message}`);
+              }
+            }
