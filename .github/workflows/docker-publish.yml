@@ -111,12 +111,16 @@ jobs:
           tags: |
             type=raw,value=latest,enabled=${{ github.ref == 'refs/heads/main' }}
             type=ref,event=pr
-
+          
+      - name: Convert multi-arch tags from newline to comma separated
+        id: multiarch-tags
+        run: |
+          tags_x86_64=$(echo "${{ steps.meta-x86_64.outputs.tags }}" | tr '\n' ',')
+          tags_arm64=$(echo "${{ steps.meta-arm64.outputs.tags }}" | tr '\n' ',')
+          echo tags="$tags_x86_64,$tags_arm64" >> $GITHUB_OUTPUT
       - name: Create and push manifest list
         uses: Noelware/docker-manifest-action@1.0.0
         with:
           inputs: ${{ steps.meta.outputs.tags }}
-          tags: |
-            ${{ steps.meta-x86_64.outputs.tags }}
-            ${{ steps.meta-arm64.outputs.tags }}
+          tags: ${{ steps.multiarch-tags.outputs.tags }}
           push: true
