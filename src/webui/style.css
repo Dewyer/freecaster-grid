@@ -1,7 +1,7 @@
 body {
-	font-family: 'Segoe UI', Arial, sans-serif;
-	background: linear-gradient(120deg, #e0e7ff 0%, #f8fafc 100%);
-	color: #222;
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+	background: linear-gradient(120deg, #181c24 0%, #23272f 100%);
+	color: #e0e7ff;
 	margin: 0;
 	min-height: 100vh;
 }
@@ -9,9 +9,10 @@ body {
 .container {
 	max-width: 700px;
 	margin: 2.5em auto;
-	background: #fff;
+	background: #23272f;
+	color: #e0e7ff;
 	border-radius: 16px;
-	box-shadow: 0 4px 24px 0 #0001;
+	box-shadow: 0 4px 24px 0 #0008;
 	padding: 2em 2.5em 1.5em 2.5em;
 }
 
@@ -63,18 +64,12 @@ h1 {
 	box-shadow: 0 1px 4px #0001;
 }
 
-body {
-	font-family: 'Segoe UI', Arial, sans-serif;
-	background: linear-gradient(120deg, #181c24 0%, #23272f 100%);
-	color: #e0e7ff;
-	margin: 0;
-	min-height: 100vh;
-	transition: background 0.3s, color 0.3s;
-}
+/* Removed duplicate body selector. Dark theme styles are in body.night below. */
 
 body.night {
 	background: linear-gradient(120deg, #181c24 0%, #23272f 100%);
 	color: #e0e7ff;
+	transition: background 0.3s, color 0.3s;
 }
 
 .container {

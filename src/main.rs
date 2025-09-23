@@ -173,10 +173,10 @@ async fn main() -> Result<()> {
                 if let Some(path) = request.url().strip_prefix("/webui/") {
                     match path {
                         "app.js" => {
-                            return rouille::Response::from_data("application/javascript", include_bytes!("webui/app.js").as_ref());
+                            return rouille::Response::from_data("application/javascript", include_str!("webui/app.js").as_bytes());
                         },
                         "style.css" => {
-                            return rouille::Response::from_data("text/css", include_bytes!("webui/style.css").as_ref());
+                            return rouille::Response::from_data("text/css", include_str!("webui/style.css"));
                         },
                         "freecaster.svg" => {
                             return rouille::Response::from_data("image/svg+xml", include_bytes!("webui/freecaster.svg").as_ref());
