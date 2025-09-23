@@ -4,6 +4,7 @@ telegram_chat_id: 0
 announcement_mode: log
 secret_key: almafa
 poll_time: 10s
+webui_enabled: true
 
 server:
   host: "localhost:4242"

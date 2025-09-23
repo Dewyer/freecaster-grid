@@ -46,6 +46,9 @@ pub struct Config {
 
     #[serde(default)]
     pub nodes: Vec<NodeConfig>,
+
+    #[serde(default)]
+    pub webui_enabled: bool,
 }
 
 pub async fn load_config(path: PathBuf) -> Result<Config> {

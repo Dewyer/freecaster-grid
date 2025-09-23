@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Grid Node Status</title>
+    <link rel="stylesheet" href="/webui/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><img src="/webui/freecaster.svg" alt="Freecaster Logo" class="logo-img"> Freecaster Grid Status</h1>
+            <div class="header-actions">
+                <button id="change-key" title="Change secret key">🔑 Change Key</button>
+            </div>
+        </header>
+        <div id="status" class="summary"></div>
+        <table id="nodes">
+            <thead>
+                <tr><th>Name</th><th>Last Poll</th><th>Status</th></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <footer>
+            <small>Powered by <b>Freecaster Grid</b> &mdash; <a href="https://github.com/Dewyer/freecaster-grid" target="_blank">GitHub</a></small>
+        </footer>
+    </div>
+    <script src="/webui/app.js"></script>
+</body>
+</html>
