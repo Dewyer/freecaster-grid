@@ -44,6 +44,7 @@ jobs:
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=ref,event=pr
+            type=sha
           labels: |
             org.opencontainers.image.source=${{ github.repository }}
             org.opencontainers.image.url=https://github.com/dewyer/freecaster-grid
