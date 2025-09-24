@@ -64,8 +64,6 @@ h1 {
 	box-shadow: 0 1px 4px #0001;
 }
 
-/* Removed duplicate body selector. Dark theme styles are in body.night below. */
-
 body.night {
 	background: linear-gradient(120deg, #181c24 0%, #23272f 100%);
 	color: #e0e7ff;
@@ -113,6 +111,7 @@ header {
 	box-shadow: 0 2px 8px #6366f11a;
 	transition: background 0.2s;
 }
+
 #change-key:hover {
 	background: #4f46e5;
 }
@@ -140,7 +139,6 @@ table {
 	transition: background 0.3s, color 0.3s;
 }
 
-
 th, td {
 	border: none;
 	padding: 0.7em 1em;
@@ -159,11 +157,72 @@ footer {
 	margin-top: 1.5em;
 	transition: color 0.3s;
 }
+
 footer a {
 	color: #6366f1;
 	text-decoration: none;
 	font-weight: 500;
 }
+
 footer a:hover {
 	text-decoration: underline;
+}
+
+.modal-bg {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	background: rgba(0,0,0,0.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+}
+
+.modal-form {
+	background: #23272f;
+	color: #e0e7ff;
+	padding: 2em 2.5em 2em 2.5em;
+	border-radius: 8px;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+	min-width: 260px;
+	font-family: inherit;
+}
+
+.modal-form label {
+	font-size: 1.1em;
+	font-weight: 500;
+}
+
+.modal-input {
+	width: 100%;
+	margin-top: 0.5em;
+	padding: 0.5em 1em;
+	border-radius: 4px;
+	border: 1px solid #444;
+	background: #181c24;
+	color: #e0e7ff;
+	font-size: 1em;
+	margin-bottom: 1em;
+	font-family: inherit;
+	box-sizing: border-box;
+}
+
+.modal-btn {
+	background: #6366f1;
+	color: #fff;
+	border: none;
+	border-radius: 6px;
+	padding: 0.5em 1.1em;
+	font-size: 1em;
+	cursor: pointer;
+	box-shadow: 0 2px 8px #6366f11a;
+	transition: background 0.2s;
+	font-family: inherit;
+}
+
+.modal-btn:hover {
+	background: #4f46e5;
 }

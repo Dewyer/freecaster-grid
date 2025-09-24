@@ -9,6 +9,13 @@
     <link rel="stylesheet" href="/webui/style.css">
 </head>
 <body>
+    <div id="modal-bg" class="modal-bg" style="display:none">
+        <form id="modal-form" class="modal-form">
+            <label for="grid-key-input">Enter grid key:</label><br>
+            <input type="password" id="grid-key-input" name="grid-key" autocomplete="off" required class="modal-input"><br><br>
+            <button type="submit" class="modal-btn">Submit</button>
+        </form>
+    </div>
     <div class="container">
         <header>
             <h1><img src="/webui/freecaster.svg" alt="Freecaster Logo" class="logo-img"> Freecaster Grid Status</h1>
