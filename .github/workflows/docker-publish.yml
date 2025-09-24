@@ -171,7 +171,7 @@ jobs:
         id: fc
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          comment-author: 'github-actions[bot]'
+          comment-author: "github-actions[bot]"
           body-includes: Docker image(s) for this PR are available
 
       - name: Create comment
@@ -187,3 +187,4 @@ jobs:
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
           body: ${{ steps.generate-comment.outputs.body }}
+          edit-mode: replace
