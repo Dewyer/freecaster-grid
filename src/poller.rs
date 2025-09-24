@@ -1,6 +1,6 @@
 use crate::{
-    AnnouncementMode, Config, GridNodeResponse, GridNodeStatus, NodeConfig, ObituaryResponse,
-    SilenceBroadcastRequest, StatusResponse,
+    GridNodeResponse, GridNodeStatus, ObituaryResponse, SilenceBroadcastRequest, StatusResponse,
+    config::{AnnouncementMode, Config, NodeConfig},
 };
 use anyhow::Result;
 use chrono::{DateTime, Utc};
