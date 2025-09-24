@@ -14,7 +14,7 @@ if (!key) {
     modal.style.zIndex = '1000';
 
     const form = document.createElement('form');
-    form.style.background = '#fff';
+    form.style.background = '#23272f';
     form.style.padding = '2em';
     form.style.borderRadius = '8px';
     form.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
