@@ -109,22 +109,6 @@ async fn main() -> Result<()> {
 
     // Load and parse config
     let mut config = dbg!(load_config(config_path).await?);
-    // if let Ok(token) = env::var("TELEGRAM_TOKEN") {
-    //     info!("Overriding telegram token with env var");
-    //     config.telegram_token = token;
-    // }
-
-    // if let Ok(chat_id) = env::var("TELEGRAM_CHAT_ID") {
-    //     info!("Overriding telegram chat id with env var");
-    //     config.telegram_chat_id = i64::from_str(&chat_id)?;
-    // }
-
-    // // WebUI toggle via env var
-    // if let Ok(webui_enabled) = env::var("WEBUI_ENABLED") {
-    //     let enabled = matches!(webui_enabled.as_str(), "1" | "true" | "yes" | "on");
-    //     info!("Overriding WebUI enabled with env var");
-    //     config.webui_enabled = enabled;
-    // }
 
     // filter myself out
     config.nodes.retain(|_, n| *n.name != config.name);
