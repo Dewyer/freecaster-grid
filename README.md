@@ -79,15 +79,12 @@ server:
     key_path: "./keys/private_key.pkcs.pem"
 nodes:
   hal9000: # The key here is not used, it's just for organization
-    name: hal9000
     address: "http://hal9000:3037"
     telegram_handle: hal9000
   hal9001:
-    name: hal9001
     address: "http://hal9001:3037"
     telegram_handle: hal9001
   hal9002:
-    name: hal9002
     address: "http://hal9002:3037"
 ```
 
@@ -111,13 +108,10 @@ FC_SERVER__IP_ADDRESS=0.0.0.0
 FC_SERVER__PORT=3037
 FC_SERVER__SSL__CERT_PATH=./keys/certificate.pem
 FC_SERVER__SSL__KEY_PATH=./keys/private_key.pkcs.pem
-FC_NODES__hal9000__NAME=hal9000
 FC_NODES__hal9000__ADDRESS=http://hal9000:3037
 FC_NODES__hal9000__TELEGRAM_HANDLE=hal9000
-FC_NODES__hal9001__NAME=hal9001
 FC_NODES__hal9001__ADDRESS=http://hal9001:3037
 FC_NODES__hal9001__TELEGRAM_HANDLE=hal9001
-FC_NODES__hal9002__NAME=hal9002
 FC_NODES__hal9002__ADDRESS=http://hal9002:3037
 ```
 

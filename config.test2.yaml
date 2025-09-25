@@ -10,11 +10,8 @@ server:
 
 nodes:
   test1:
-    name: "Test1"
     address: "http://localhost:4242"
   test2:
-    name: "Test2"
     address: "http://localhost:4243"
   test3:
-    name: "Test3"
     address: "http://localhost:4244"
