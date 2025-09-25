@@ -3,3 +3,4 @@ Dockerfile
 *.yaml
 *.yml
 .env
+.github/

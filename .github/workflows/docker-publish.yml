@@ -8,6 +8,9 @@ on:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
+env:
+  REGISTRY_IMAGE: ghcr.io/dewyer/freecaster-grid
+
 jobs:
   build-and-push:
     name: Build and push Docker image on ${{ matrix.arch }}
@@ -40,15 +43,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/dewyer/freecaster-grid
-          flavor: suffix=-${{ matrix.arch }},onlatest=true
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=ref,event=pr
-          labels: |
-            org.opencontainers.image.source=${{ github.repository }}
-            org.opencontainers.image.url=https://github.com/dewyer/freecaster-grid
-            org.opencontainers.image.revision=${{ github.sha }}
+          images: ${{ env.REGISTRY_IMAGE }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -59,7 +54,7 @@ jobs:
         with:
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY_IMAGE }}
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
@@ -128,39 +123,6 @@ jobs:
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ghcr.io/dewyer/freecaster-grid:${{ steps.meta.outputs.version }}
-
-      # - name: Metadata for x86_64
-      #   id: meta-x86_64
-      #   uses: docker/metadata-action@v5
-      #   with:
-      #     images: ghcr.io/dewyer/freecaster-grid
-      #     flavor: suffix=-x86_64
-      #     tags: |
-      #       type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-      #       type=ref,event=pr
-
-      # - name: Metadata for arm64
-      #   id: meta-arm64
-      #   uses: docker/metadata-action@v5
-      #   with:
-      #     images: ghcr.io/dewyer/freecaster-grid
-      #     flavor: suffix=-arm64
-      #     tags: |
-      #       type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-      #       type=ref,event=pr
-
-      # - name: Convert multi-arch tags from newline to comma separated
-      #   id: multiarch-tags
-      #   run: |
-      #     tags_x86_64=$(echo "${{ steps.meta-x86_64.outputs.tags }}" | tr '\n' ',')
-      #     tags_arm64=$(echo "${{ steps.meta-arm64.outputs.tags }}" | tr '\n' ',')
-      #     echo tags="$tags_x86_64,$tags_arm64" >> $GITHUB_OUTPUT
-      # - name: Create and push manifest list
-      #   uses: Noelware/docker-manifest-action@1.0.0
-      #   with:
-      #     tags: ${{ steps.meta.outputs.tags }}
-      #     inputs: ${{ steps.multiarch-tags.outputs.tags }}
-      #     push: true
 
   comment-pr:
     name: Comment on PR with Docker image info
