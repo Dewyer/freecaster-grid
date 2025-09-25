@@ -38,6 +38,13 @@ Setup a config file for all participating nodes, generate keys, then start the s
 cargo run --release -- config.yaml
 ```
 
+## Docker
+There is a dockerized version available for deployment.
+```
+docker pull ghcr.io/dewyer/freecaster-grid:latest
+```
+For an example docker compose configuration, see the [compose.yaml file](examples/compose.yaml).
+
 ## Configuration
 Example config:
 ```yaml
@@ -45,6 +52,7 @@ name: hal9000
 telegram_token: SOME_VERY_LONG_TOKEN
 telegram_chat_id: 1234567890
 secret_key: SOME_VERY_LONG_SECRET_KEY
+webui_enabled: true
 server:
   host: "0.0.0.0:3037"
   ssl: false
@@ -55,8 +63,9 @@ nodes:
   - name: hal9002
     address: "http://hal9002:3037"
 ```
-# Docker
-There is a dockerized version available for testing, which enables to run multiple instances of freecaster-grid.
+
+# Testing
+There is a dockerized version available for testing, which enables to run multiple instances of freecaster-grid locally. This can be used to test the application as a whole.
 ```
 docker compose up --build
 ```
