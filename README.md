@@ -124,3 +124,12 @@ There is a dockerized version available for testing, which enables to run multip
 ```
 docker compose up --build
 ```
+
+## JSON Schema
+
+The JSON schema for the configuration file is located at `./config.schema.json`.
+This can be used to validate your configuration file in your editor, if it supports JSON schema validation.
+
+If you modified the config structure, please also update the schema file.
+The schema can be generated with `cargo run -F json_schema -- config.schema.json`.
+This will write the schema to the specified file.
