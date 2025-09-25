@@ -380,7 +380,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
                         .iter()
                         .find(|(_, n)| n.name == fs.name)
                         .expect("node");
-                    announcements.push(node.clone());
+                    announcements.push(node);
                 } else {
                     warn!(
                         "Node `{}`'s death to be announced by `{}` death rolled: {}",
@@ -397,7 +397,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
         for (_, anc) in announcements {
             match poller_config.announcement_mode {
                 AnnouncementMode::Telegram => {
-                    announce_telegram(&poller_config.name, &anc, &poller_config, true).await;
+                    announce_telegram(&poller_config.name, anc, &poller_config, true).await;
                 }
                 AnnouncementMode::Log => {
                     error!("Announcement!!!: `{}` is dead.", anc.name);
@@ -579,7 +579,7 @@ async fn announce_telegram(me: &str, target: &NodeConfig, config: &Arc<Config>, 
                 target.name
             )
         },
-        &token,
+        token,
         *chat_id,
     );
     if res.error() {

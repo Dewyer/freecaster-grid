@@ -32,3 +32,7 @@ config = { version = "0.15.17", default-features = false, features = [
     "convert-case",
     "yaml",
 ] }
+schemars = { version = "1.0.4", optional = true }
+
+[features]
+json_schema = ["dep:schemars"]

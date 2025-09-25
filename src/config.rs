@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 pub struct ServerConfig {
     pub host: String,
     #[serde(default)]
@@ -11,12 +12,14 @@ pub struct ServerConfig {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 pub struct SSLConfig {
     pub cert_path: String,
     pub key_path: String,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone, Serialize)]
+#[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 pub struct NodeConfig {
     pub name: String,
     #[serde(default)]
@@ -25,6 +28,7 @@ pub struct NodeConfig {
 }
 
 #[derive(Debug, Deserialize, Default, Clone, Copy, Serialize)]
+#[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum AnnouncementMode {
     #[default]
@@ -33,12 +37,14 @@ pub enum AnnouncementMode {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 pub struct TelegramConfig {
     pub token: String,
     pub chat_id: i64,
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 pub struct Config {
     pub name: String,
     #[serde(default)]
@@ -46,6 +52,7 @@ pub struct Config {
     pub secret_key: String,
     #[serde(default)]
     #[serde(with = "humantime_serde")]
+    #[cfg_attr(feature = "json_schema", schemars(with = "String"))]
     pub poll_time: Option<std::time::Duration>,
 
     #[serde(default)]
