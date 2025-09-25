@@ -115,6 +115,13 @@ async fn main() -> Result<()> {
         config.telegram_chat_id = i64::from_str(&chat_id)?;
     }
 
+    // WebUI toggle via env var
+    if let Ok(webui_enabled) = env::var("WEBUI_ENABLED") {
+        let enabled = matches!(webui_enabled.as_str(), "1" | "true" | "yes" | "on");
+        info!("Overriding WebUI enabled with env var");
+        config.webui_enabled = enabled;
+    }
+
     // filter myself out
     config.nodes.retain(|n| n.name != config.name);
 
@@ -156,7 +163,28 @@ async fn main() -> Result<()> {
         let host = server_config.server.host.clone();
         let ssl = server_config.server.ssl;
 
+        let webui_enabled = server_config.webui_enabled;
         let router = move |request: &Request| {
+            // Serve /webui and static files if enabled
+            if webui_enabled {
+                if request.url() == "/webui" || request.url() == "/webui/" {
+                    return rouille::Response::html(include_str!("webui/index.html"));
+                }
+                if let Some(path) = request.url().strip_prefix("/webui/") {
+                    match path {
+                        "app.js" => {
+                            return rouille::Response::from_data("application/javascript", include_str!("webui/app.js").as_bytes());
+                        },
+                        "style.css" => {
+                            return rouille::Response::from_data("text/css", include_str!("webui/style.css"));
+                        },
+                        "freecaster.svg" => {
+                            return rouille::Response::from_data("image/svg+xml", include_bytes!("webui/freecaster.svg").as_ref());
+                        },
+                        _ => {}
+                    }
+                }
+            }
             router!(request,
                 (GET) (/) => {
                     let user_agent = request.header("User-Agent").unwrap_or("Unknown");
