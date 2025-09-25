@@ -4,3 +4,8 @@ Dockerfile
 *.yml
 .env
 .github/
+.idea
+examples/
+README.md
+LICENSE
+
