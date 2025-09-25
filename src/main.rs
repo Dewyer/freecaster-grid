@@ -1,6 +1,4 @@
 mod config;
-#[cfg(feature = "json_schema")]
-mod json_schema;
 mod poller;
 
 use crate::config::{Config, SSLConfig, load_config};
@@ -81,10 +79,6 @@ pub struct SilenceBroadcastRequest {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    #[cfg(feature = "json_schema")]
-    {
-        json_schema::generate_json_schema()?;
-    }
     dotenvy::dotenv().ok();
     Builder::new()
         .format(|buf, record| {
@@ -114,7 +108,7 @@ async fn main() -> Result<()> {
     };
 
     // Load and parse config
-    let mut config = dbg!(load_config(config_path).await?);
+    let mut config = load_config(config_path).await?;
 
     // filter myself out
     config.nodes.retain(|name, _| *name != config.name);

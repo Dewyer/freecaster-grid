@@ -7,7 +7,8 @@ poll_time: 10s
 webui_enabled: true
 
 server:
-  host: "localhost:4242"
+  ip_address: "0.0.0.0"
+  port: 4242
   ssl: null
 
 nodes:

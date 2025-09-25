@@ -2,6 +2,7 @@
 name = "freecaster-grid"
 version = "0.2.0"
 edition = "2024"
+default-run = "freecaster-grid"
 
 [dependencies]
 serde = { version = "1.0.219", features = ["derive"] }
@@ -36,3 +37,13 @@ schemars = { version = "1.0.4", optional = true }
 
 [features]
 json_schema = ["dep:schemars"]
+
+[[bin]]
+name = "freecaster-grid"
+path = "src/main.rs"
+
+
+[[bin]]
+name = "freecaster-grid-schema"
+path = "src/json_schema.rs"
+required-features = ["json_schema"]

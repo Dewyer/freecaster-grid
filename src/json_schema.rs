@@ -1,8 +1,10 @@
+mod config;
+
 use anyhow::Context;
 
 use crate::config::Config;
 
-pub fn generate_json_schema() -> anyhow::Result<()> {
+pub fn main() -> anyhow::Result<()> {
     let schema = schemars::schema_for!(Config);
     let schema = serde_json::to_string(&schema)?;
 

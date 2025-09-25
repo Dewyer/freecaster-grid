@@ -3,7 +3,7 @@ announcement_mode: log
 secret_key: almafa
 
 server:
-  host: "localhost:4243"
+  port: 4243
   ssl:
     cert_path: "./keys/certificate.pem"
     key_path: "./keys/private_key.pkcs.pem"

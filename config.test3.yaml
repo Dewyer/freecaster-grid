@@ -6,7 +6,7 @@ telegram:
 secret_key: almafa
 
 server:
-  host: "localhost:4244"
+  port: 4244
 
 nodes:
   test1:
