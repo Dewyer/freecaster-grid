@@ -1,0 +1,159 @@
+# YAML Schema for freecaster-grid configurations
+# This can be used with YAML validators for configuration validation
+
+---
+# Schema for Local Configuration (split format)
+local_config_schema:
+  type: object
+  required:
+    - name
+    - server
+  properties:
+    name:
+      type: string
+      description: "Unique name for this node instance"
+    
+    server:
+      type: object
+      required:
+        - host
+        - ssl
+      properties:
+        host:
+          type: string
+          description: "Server bind address (host:port)"
+        ssl:
+          type: boolean
+          description: "Enable/disable SSL/TLS"
+        cert_path:
+          type: string
+          description: "Path to TLS certificate file"
+        key_path:
+          type: string
+          description: "Path to TLS private key file"
+    
+    webui_enabled:
+      type: boolean
+      default: false
+      description: "Enable/disable web UI"
+    
+    grid_config_path:
+      type: string
+      description: "Path to grid configuration file"
+    
+    grid_config_url:
+      type: string
+      description: "URL to remote grid configuration"
+    
+    auto_update_grid_config:
+      type: boolean
+      default: false
+      description: "Automatically update grid config from remote source"
+
+---
+# Schema for Grid Configuration (shared settings)
+grid_config_schema:
+  type: object
+  required:
+    - telegram_token
+    - telegram_chat_id
+    - secret_key
+  properties:
+    telegram_token:
+      type: string
+      description: "Telegram bot token for notifications"
+    
+    telegram_chat_id:
+      type: integer
+      description: "Telegram chat ID for notifications"
+    
+    secret_key:
+      type: string
+      description: "Shared secret key for grid authentication"
+    
+    poll_time:
+      type: string
+      pattern: "^\\d+[smhd]$"
+      description: "Polling interval (e.g., '30s', '5m')"
+    
+    announcement_mode:
+      type: string
+      enum: ["telegram", "log"]
+      default: "telegram"
+      description: "How to announce node failures"
+    
+    nodes:
+      type: array
+      items:
+        type: object
+        required:
+          - name
+          - address
+        properties:
+          name:
+            type: string
+            description: "Node name"
+          address:
+            type: string
+            description: "Node HTTP/HTTPS address"
+          telegram_handle:
+            type: string
+            description: "Optional Telegram handle for node owner"
+
+---
+# Schema for Legacy Configuration (combined format)
+legacy_config_schema:
+  type: object
+  required:
+    - name
+    - telegram_token
+    - telegram_chat_id
+    - secret_key
+    - server
+  properties:
+    name:
+      type: string
+    telegram_token:
+      type: string
+    telegram_chat_id:
+      type: integer
+    secret_key:
+      type: string
+    poll_time:
+      type: string
+      pattern: "^\\d+[smhd]$"
+    announcement_mode:
+      type: string
+      enum: ["telegram", "log"]
+      default: "telegram"
+    webui_enabled:
+      type: boolean
+      default: false
+    server:
+      type: object
+      required:
+        - host
+        - ssl
+      properties:
+        host:
+          type: string
+        ssl:
+          type: boolean
+        cert_path:
+          type: string
+        key_path:
+          type: string
+    nodes:
+      type: array
+      items:
+        type: object
+        required:
+          - name
+          - address
+        properties:
+          name:
+            type: string
+          address:
+            type: string
+          telegram_handle:
+            type: string

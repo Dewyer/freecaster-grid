@@ -1,0 +1,40 @@
+# Legacy combined configuration format (still supported)
+# All settings are in one file - useful for simple deployments
+
+name: hal9000
+telegram_token: "YOUR_TELEGRAM_BOT_TOKEN_HERE"
+telegram_chat_id: 1234567890
+secret_key: "YOUR_SHARED_GRID_SECRET_KEY_HERE"
+webui_enabled: true
+
+# Optional settings
+poll_time: 30s
+announcement_mode: telegram
+
+server:
+  host: "0.0.0.0:3037"
+  ssl: false
+  # Optional: TLS configuration
+  # cert_path: "./keys/certificate.pem"
+  # key_path: "./keys/private_key.pkcs.pem"
+
+nodes:
+  - name: hal9001
+    address: "http://hal9001:3037"
+    telegram_handle: "hal9001_user"
+  - name: hal9002
+    address: "http://hal9002:3037"
+    telegram_handle: "hal9002_user"
+
+# Environment variable overrides (new systematic approach):
+# FREECASTER_NAME=new-name
+# FREECASTER_TELEGRAM_TOKEN=your-token-here
+# FREECASTER_TELEGRAM_CHAT_ID=123456789
+# FREECASTER_SECRET_KEY=your-secret-here
+# FREECASTER_POLL_TIME=60s
+# FREECASTER_ANNOUNCEMENT_MODE=log
+# FREECASTER_WEBUI_ENABLED=false
+# FREECASTER_SERVER_HOST=0.0.0.0:8080
+# FREECASTER_SERVER_SSL=true
+# FREECASTER_SERVER_CERT_PATH=./certs/cert.pem
+# FREECASTER_SERVER_KEY_PATH=./certs/key.pem

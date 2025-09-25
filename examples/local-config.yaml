@@ -1,0 +1,28 @@
+# Local instance configuration
+# This contains personal/instance-specific settings
+name: hal9000
+
+# Server configuration
+server:
+  host: "0.0.0.0:3037"
+  ssl: false
+  # Optional: paths to TLS certificates if SSL is enabled
+  # cert_path: "./keys/certificate.pem"
+  # key_path: "./keys/private_key.pkcs.pem"
+
+# Enable/disable WebUI
+webui_enabled: true
+
+# Grid configuration source - choose ONE of the following:
+
+# Option 1: Load grid config from local file
+grid_config_path: "./examples/grid-config.yaml"
+
+# Option 2: Load grid config from remote URL (commented out)
+# grid_config_url: "https://raw.githubusercontent.com/your-org/grid-config/main/config.yaml"
+# auto_update_grid_config: true
+
+# Note: Environment variables can override any setting using FREECASTER_ prefix:
+# FREECASTER_NAME=new-name
+# FREECASTER_SERVER_HOST=0.0.0.0:8080
+# FREECASTER_WEBUI_ENABLED=false

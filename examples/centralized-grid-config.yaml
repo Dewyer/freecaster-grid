@@ -1,0 +1,45 @@
+# Centralized Grid Configuration Example
+# This file would be hosted in a shared location (e.g., Git repository, HTTP server)
+# All nodes in the grid would reference this centralized configuration
+
+# Security Note: Avoid putting actual secrets in centralized configs
+# Use environment variables for sensitive information instead
+
+# Grid metadata
+telegram_token: "SET_VIA_FREECASTER_TELEGRAM_TOKEN_ENV_VAR"
+telegram_chat_id: 0  # Set via FREECASTER_TELEGRAM_CHAT_ID
+secret_key: "SET_VIA_FREECASTER_SECRET_KEY_ENV_VAR"
+
+# Shared grid settings
+poll_time: 30s
+announcement_mode: telegram
+
+# All nodes in the grid
+nodes:
+  - name: homelab-primary
+    address: "https://homelab-primary.example.com:3037"
+    telegram_handle: "homelab_admin"
+    
+  - name: homelab-secondary  
+    address: "https://homelab-secondary.example.com:3037"
+    telegram_handle: "homelab_admin"
+    
+  - name: vps-monitor
+    address: "https://vps.example.com:3037"
+    telegram_handle: "vps_admin"
+    
+  - name: cloud-backup
+    address: "https://cloud-backup.example.com:3037"
+    telegram_handle: "backup_admin"
+
+# Benefits of centralized configuration:
+# - Add/remove nodes from one location
+# - Consistent grid-wide settings
+# - Version controlled changes
+# - Automatic propagation to all nodes
+
+# Security considerations:
+# - Don't commit real secrets to version control
+# - Use environment variables for sensitive values
+# - Consider encrypting the configuration file
+# - Restrict access to the configuration repository/server

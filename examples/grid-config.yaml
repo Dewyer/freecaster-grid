@@ -1,0 +1,35 @@
+# Grid configuration
+# This contains shared settings across all nodes in the grid
+# Can be hosted centrally and shared by all nodes
+
+# Telegram notification settings
+telegram_token: "YOUR_TELEGRAM_BOT_TOKEN_HERE"
+telegram_chat_id: 1234567890
+
+# Grid security settings
+secret_key: "YOUR_SHARED_GRID_SECRET_KEY_HERE"
+
+# Polling configuration
+poll_time: 30s
+
+# Announcement mode: telegram or log
+announcement_mode: telegram
+
+# Grid nodes
+nodes:
+  - name: hal9000
+    address: "http://hal9000:3037"
+    telegram_handle: "hal9000_user"
+  - name: hal9001
+    address: "http://hal9001:3037"
+    telegram_handle: "hal9001_user"
+  - name: hal9002
+    address: "http://hal9002:3037"
+    telegram_handle: "hal9002_user"
+
+# Note: Environment variables can override grid settings too:
+# FREECASTER_TELEGRAM_TOKEN=your-token-here
+# FREECASTER_TELEGRAM_CHAT_ID=123456789
+# FREECASTER_SECRET_KEY=your-secret-here
+# FREECASTER_POLL_TIME=60s
+# FREECASTER_ANNOUNCEMENT_MODE=log
