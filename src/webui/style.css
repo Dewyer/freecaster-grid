@@ -1,5 +1,29 @@
+@media (prefers-color-scheme: dark) {
+
+	.logo-svg #grid,
+	.logo-svg #globe {
+		stroke: #e0e7ff;
+	}
+
+	.logo-svg circle {
+		fill: #e0e7ff;
+	}
+}
+
+@media (prefers-color-scheme: light) {
+
+	.logo-svg #grid,
+	.logo-svg #globe {
+		stroke: #181c24;
+	}
+
+	.logo-svg circle {
+		fill: #181c24;
+	}
+}
+
 body {
-    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+	font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
 	background: linear-gradient(120deg, #181c24 0%, #23272f 100%);
 	color: #e0e7ff;
 	margin: 0;
@@ -33,10 +57,21 @@ h1 {
 	gap: 0.5em;
 }
 
-.logo-img {
+
+.logo-svg {
 	height: 2em;
+	width: 2em;
 	vertical-align: middle;
 	margin-right: 0.5em;
+}
+
+.logo-svg #grid {
+	transition: transform 1.5s cubic-bezier(0.4, 0.2, 0.2, 1);
+	transform-origin: 50% 50%;
+}
+
+.logo-svg:hover #grid {
+	transform: rotate(360deg);
 }
 
 #change-key {
@@ -50,6 +85,7 @@ h1 {
 	box-shadow: 0 2px 8px #6366f11a;
 	transition: background 0.2s;
 }
+
 #change-key:hover {
 	background: #4f46e5;
 }
@@ -139,7 +175,8 @@ table {
 	transition: background 0.3s, color 0.3s;
 }
 
-th, td {
+th,
+td {
 	border: none;
 	padding: 0.7em 1em;
 	text-align: left;
@@ -174,7 +211,7 @@ footer a:hover {
 	left: 0;
 	width: 100vw;
 	height: 100vh;
-	background: rgba(0,0,0,0.5);
+	background: rgba(0, 0, 0, 0.5);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -186,7 +223,7 @@ footer a:hover {
 	color: #e0e7ff;
 	padding: 2em 2.5em 2em 2.5em;
 	border-radius: 8px;
-	box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 	min-width: 260px;
 	font-family: inherit;
 }

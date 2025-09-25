@@ -181,6 +181,12 @@ async fn main() -> Result<()> {
                         "freecaster.svg" => {
                             return rouille::Response::from_data("image/svg+xml", include_bytes!("webui/freecaster.svg").as_ref());
                         },
+                        "freecaster-dark.svg" => {
+                            return rouille::Response::from_data("image/svg+xml", include_bytes!("webui/freecaster-dark.svg").as_ref());
+                        },
+                        "freecaster-light.svg" => {
+                            return rouille::Response::from_data("image/svg+xml", include_bytes!("webui/freecaster-light.svg").as_ref());
+                        },
                         _ => {}
                     }
                 }

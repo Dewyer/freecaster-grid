@@ -1,24 +1,61 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Grid Node Status</title>
+    <link rel="icon" type="image/svg+xml" href="/webui/freecaster-light.svg" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/svg+xml" href="/webui/freecaster-dark.svg" media="(prefers-color-scheme: dark)">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/webui/style.css">
+
 </head>
+
 <body>
     <div id="modal-bg" class="modal-bg" style="display:none">
         <form id="modal-form" class="modal-form">
             <label for="grid-key-input">Enter grid key:</label><br>
-            <input type="password" id="grid-key-input" name="grid-key" autocomplete="off" required class="modal-input"><br><br>
+            <input type="password" id="grid-key-input" name="grid-key" autocomplete="off" required
+                class="modal-input"><br><br>
             <button type="submit" class="modal-btn">Submit</button>
         </form>
     </div>
     <div class="container">
         <header>
-            <h1><img src="/webui/freecaster.svg" alt="Freecaster Logo" class="logo-img"> Freecaster Grid Status</h1>
+            <h1>
+                <svg class="logo-svg" xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 256 256"
+                    aria-label="Freecaster Logo">
+                    <defs>
+                        <filter id="purple-shine" x="-30%" y="-30%" width="160%" height="160%">
+                            <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#a78bfa" flood-opacity="1" />
+                        </filter>
+                    </defs>
+                    <g stroke-width="5pt" id="grid" filter="url(#purple-shine)">
+                        <path fill-opacity="0" d="M128 32 L208 80 L208 176 L128 224 L48 176 L48 80 Z" />
+                        <g>
+                            <circle cx="128" cy="32" r="10" />
+                            <circle cx="208" cy="80" r="10" />
+                            <circle cx="208" cy="176" r="10" />
+                            <circle cx="128" cy="224" r="10" />
+                            <circle cx="48" cy="176" r="10" />
+                            <circle cx="48" cy="80" r="10" />
+                        </g>
+                    </g>
+                    <g stroke-width="5pt" id="globe" filter="url(#purple-shine)">
+                        <circle cx="128" cy="128" r="48" fill-opacity="0" />
+                        <line x1="80" x2="176" y1="128" y2="128" />
+                        <path d="M86 100 Q128 120 170 100" fill-opacity="0" />
+                        <path d="M86 156 Q128 136 170 156" fill-opacity="0" />
+                        <path d="M128 80 Q108 95 108 128" fill-opacity="0" />
+                        <path d="M108 128 Q108 161 128 176" fill-opacity="0" />
+                        <path d="M128 80 Q148 95 148 128" fill-opacity="0" />
+                        <path d="M148 128 Q148 161 128 176" fill-opacity="0" />
+                    </g>
+                </svg>
+                Freecaster Grid Status
+            </h1>
             <div class="header-actions">
                 <button id="change-key" title="Change secret key">🔑 Change Key</button>
             </div>
@@ -26,14 +63,20 @@
         <div id="status" class="summary"></div>
         <table id="nodes">
             <thead>
-                <tr><th>Name</th><th>Last Poll</th><th>Status</th></tr>
+                <tr>
+                    <th>Name</th>
+                    <th>Last Poll</th>
+                    <th>Status</th>
+                </tr>
             </thead>
             <tbody></tbody>
         </table>
         <footer>
-            <small>Powered by <b>Freecaster Grid</b> &mdash; <a href="https://github.com/Dewyer/freecaster-grid" target="_blank">GitHub</a></small>
+            <small>Powered by <b>Freecaster Grid</b> &mdash; <a href="https://github.com/Dewyer/freecaster-grid"
+                    target="_blank">GitHub</a></small>
         </footer>
     </div>
     <script src="/webui/app.js"></script>
 </body>
+
 </html>

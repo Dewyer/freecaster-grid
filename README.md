@@ -1,3 +1,7 @@
+<div align="center">
+<img src="./src/webui/freecaster.svg" alt="Freecaster Logo" width="128" height="128"/>
+</div>
+
 # freecaster-grid
 Freecaster grid, buddy home lab death notifier
 Its purpose is to send telegram notifications in case a home lab in the grid goes down.
