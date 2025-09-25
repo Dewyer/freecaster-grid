@@ -98,57 +98,51 @@ async fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 2 {
-        error!("Usage: {} <config_path>", args[0]);
-        std::process::exit(1);
+        warn!("Running without config file")
     }
+
+    let config_path = if args.len() >= 2 {
+        Some(PathBuf::from(&args[1]))
+    } else {
+        None
+    };
 
     // Load and parse config
-    let config_path = PathBuf::from(&args[1]);
-    let mut config = load_config(config_path).await?;
-    if let Ok(token) = env::var("TELEGRAM_TOKEN") {
-        info!("Overriding telegram token with env var");
-        config.telegram_token = token;
-    }
+    let mut config = dbg!(load_config(config_path).await?);
+    // if let Ok(token) = env::var("TELEGRAM_TOKEN") {
+    //     info!("Overriding telegram token with env var");
+    //     config.telegram_token = token;
+    // }
 
-    if let Ok(chat_id) = env::var("TELEGRAM_CHAT_ID") {
-        info!("Overriding telegram chat id with env var");
-        config.telegram_chat_id = i64::from_str(&chat_id)?;
-    }
+    // if let Ok(chat_id) = env::var("TELEGRAM_CHAT_ID") {
+    //     info!("Overriding telegram chat id with env var");
+    //     config.telegram_chat_id = i64::from_str(&chat_id)?;
+    // }
 
-    // WebUI toggle via env var
-    if let Ok(webui_enabled) = env::var("WEBUI_ENABLED") {
-        let enabled = matches!(webui_enabled.as_str(), "1" | "true" | "yes" | "on");
-        info!("Overriding WebUI enabled with env var");
-        config.webui_enabled = enabled;
-    }
+    // // WebUI toggle via env var
+    // if let Ok(webui_enabled) = env::var("WEBUI_ENABLED") {
+    //     let enabled = matches!(webui_enabled.as_str(), "1" | "true" | "yes" | "on");
+    //     info!("Overriding WebUI enabled with env var");
+    //     config.webui_enabled = enabled;
+    // }
 
     // filter myself out
-    config.nodes.retain(|n| n.name != config.name);
+    config.nodes.retain(|_, n| *n.name != config.name);
 
     let config = Arc::new(config);
 
     info!("Loaded configuration, this node is: {}", config.name);
 
-    let cert = if let Some(cert_path) = &config.server.cert_path {
-        info!("Using certificate from {cert_path:?}");
-        Some(
-            fs::read(cert_path)
-                .await
-                .with_context(|| "Failed to read certificate")?,
-        )
+    let (key, cert) = if let Some(ssl_config) = &config.server.ssl {
+        let cert = fs::read(&ssl_config.cert_path)
+            .await
+            .with_context(|| "Failed to read certificate")?;
+        let key = fs::read(&ssl_config.key_path)
+            .await
+            .with_context(|| "Failed to read key")?;
+        (Some(key), Some(cert))
     } else {
-        None
-    };
-
-    let key = if let Some(key_path) = &config.server.key_path {
-        info!("Using kery from {key_path:?}");
-        Some(
-            fs::read(key_path)
-                .await
-                .with_context(|| "Failed to read key")?,
-        )
-    } else {
-        None
+        (None, None)
     };
 
     let mut js = JoinSet::new();
@@ -161,7 +155,7 @@ async fn main() -> Result<()> {
         info!("Starting server `{}`", server_config.server.host);
 
         let host = server_config.server.host.clone();
-        let ssl = server_config.server.ssl;
+        let ssl = server_config.server.ssl.is_some();
 
         let webui_enabled = server_config.webui_enabled;
         let router = move |request: &Request| {

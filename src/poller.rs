@@ -1,6 +1,6 @@
 use crate::{
     GridNodeResponse, GridNodeStatus, ObituaryResponse, SilenceBroadcastRequest, StatusResponse,
-    config::{AnnouncementMode, Config, NodeConfig},
+    config::{AnnouncementMode, Config, NodeConfig, TelegramConfig},
 };
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -124,7 +124,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
     // init state
     {
         let mut gr = state.lock().expect("Failed to lock state");
-        for node in poller_config.nodes.iter() {
+        for (_, node) in poller_config.nodes.iter() {
             gr.node_state.push(NodeState::new(node.name.clone()));
         }
     }
@@ -156,7 +156,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
             }
 
             // broadcast
-            for node in poller_config.nodes.iter() {
+            for (_, node) in poller_config.nodes.iter() {
                 let done = call_silence_broadcast(
                     &client,
                     &poller_config.name,
@@ -185,7 +185,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
 
         info!("Polling nodes @`{time:?}`");
         let mut poll_res = HashMap::new();
-        for node in poller_config.nodes.iter() {
+        for (_, node) in poller_config.nodes.iter() {
             if silenced_nodes_clone
                 .iter()
                 .any(|sl| sl.node_name == node.name)
@@ -264,7 +264,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
             .iter()
             .any(|fs| fs.is_dead() && fs.announced.is_none())
         {
-            for node in poller_config.nodes.iter() {
+            for (_, node) in poller_config.nodes.iter() {
                 if dead_copies.iter().any(|fs| fs.name == node.name) {
                     continue;
                 }
@@ -378,7 +378,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
                     let node = poller_config
                         .nodes
                         .iter()
-                        .find(|n| n.name == fs.name)
+                        .find(|(_, n)| n.name == fs.name)
                         .expect("node");
                     announcements.push(node.clone());
                 } else {
@@ -394,7 +394,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
             announcements
         };
 
-        for anc in announcements {
+        for (_, anc) in announcements {
             match poller_config.announcement_mode {
                 AnnouncementMode::Telegram => {
                     announce_telegram(&poller_config.name, &anc, &poller_config, true).await;
@@ -560,6 +560,13 @@ async fn announce_telegram(me: &str, target: &NodeConfig, config: &Arc<Config>, 
         "".to_string()
     };
 
+    let TelegramConfig { token, chat_id } = if let Some(telegram) = config.telegram.as_ref() {
+        telegram
+    } else {
+        error!("Telegram announcement requested but no telegram config");
+        return;
+    };
+
     let res = telegram_notifyrs::send_message(
         if is_dead {
             format!(
@@ -572,8 +579,8 @@ async fn announce_telegram(me: &str, target: &NodeConfig, config: &Arc<Config>, 
                 target.name
             )
         },
-        &config.telegram_token,
-        config.telegram_chat_id,
+        &token,
+        *chat_id,
     );
     if res.error() {
         error!("Telegram notification failed: {}", res.status());

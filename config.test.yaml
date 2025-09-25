@@ -1,6 +1,4 @@
 name: Test1
-telegram_token: "test"
-telegram_chat_id: 0
 announcement_mode: log
 secret_key: almafa
 poll_time: 10s
@@ -8,12 +6,15 @@ webui_enabled: true
 
 server:
   host: "localhost:4242"
-  ssl: false
+  ssl: null
 
 nodes:
-  - name: "Test1"
+  test1:
+    name: "Test1"
     address: "http://localhost:4242"
-  - name: "Test2"
+  test2:
+    name: "Test2"
     address: "http://localhost:4243"
-  - name: "Test3"
+  test3:
+    name: "Test3"
     address: "http://localhost:4244"

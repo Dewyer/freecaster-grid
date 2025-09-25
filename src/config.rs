@@ -1,16 +1,19 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
+use config::Case;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use tokio::fs;
+use std::{collections::HashMap, path::PathBuf};
 
 #[derive(Debug, Deserialize)]
 pub struct ServerConfig {
     pub host: String,
-    pub ssl: bool,
     #[serde(default)]
-    pub cert_path: Option<String>,
-    #[serde(default)]
-    pub key_path: Option<String>,
+    pub ssl: Option<SSLConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SSLConfig {
+    pub cert_path: String,
+    pub key_path: String,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone, Serialize)]
@@ -30,10 +33,16 @@ pub enum AnnouncementMode {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct TelegramConfig {
+    pub token: String,
+    pub chat_id: i64,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Config {
     pub name: String,
-    pub telegram_token: String,
-    pub telegram_chat_id: i64,
+    #[serde(default)]
+    pub telegram: Option<TelegramConfig>,
     pub secret_key: String,
     #[serde(default)]
     #[serde(with = "humantime_serde")]
@@ -45,16 +54,29 @@ pub struct Config {
     pub server: ServerConfig,
 
     #[serde(default)]
-    pub nodes: Vec<NodeConfig>,
+    pub nodes: HashMap<String, NodeConfig>,
 
     #[serde(default)]
     pub webui_enabled: bool,
 }
 
-pub async fn load_config(path: PathBuf) -> Result<Config> {
-    log::info!("Loading config from {path:?}");
+pub async fn load_config(path: Option<PathBuf>) -> Result<Config> {
+    let config = config::Config::builder();
+    let config = if let Some(path) = path {
+        config.add_source(config::File::from(path.clone()))
+    } else {
+        config
+    };
+    let config = config
+        .add_source(
+            config::Environment::with_prefix("FREECASTER")
+                .separator("__")
+                .convert_case(Case::Snake),
+        )
+        .build()
+        .context("Failed to build config")?
+        .try_deserialize()
+        .context("Failed to deserialize config")?;
 
-    let config_str = fs::read_to_string(path).await?;
-    let config: Config = serde_norway::from_str(&config_str)?;
     Ok(config)
 }
