@@ -20,8 +20,10 @@ jobs:
         include:
           - ubuntu-flavor: latest
             arch: x86_64
+            platform: linux/amd64
           - ubuntu-flavor: 24.04-arm
             arch: arm64
+            platform: linux/arm64
 
     steps:
       - name: Checkout repo
@@ -51,14 +53,30 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
         with:
-          context: .
-          push: true
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
 
   unify-manifests:
     name: Unify Docker manifests
@@ -71,6 +89,13 @@ jobs:
       packages: write
 
     steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -89,43 +114,53 @@ jobs:
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=ref,event=pr
+            type=sha
           labels: |
             org.opencontainers.image.source=${{ github.repository }}
             org.opencontainers.image.url=https://github.com/dewyer/freecaster-grid
             org.opencontainers.image.revision=${{ github.sha }}
-
-      - name: Metadata for x86_64
-        id: meta-x86_64
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/dewyer/freecaster-grid
-          flavor: suffix=-x86_64
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=ref,event=pr
-
-      - name: Metadata for arm64
-        id: meta-arm64
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/dewyer/freecaster-grid
-          flavor: suffix=-arm64
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=ref,event=pr
-
-      - name: Convert multi-arch tags from newline to comma separated
-        id: multiarch-tags
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
         run: |
-          tags_x86_64=$(echo "${{ steps.meta-x86_64.outputs.tags }}" | tr '\n' ',')
-          tags_arm64=$(echo "${{ steps.meta-arm64.outputs.tags }}" | tr '\n' ',')
-          echo tags="$tags_x86_64,$tags_arm64" >> $GITHUB_OUTPUT
-      - name: Create and push manifest list
-        uses: Noelware/docker-manifest-action@1.0.0
-        with:
-          tags: ${{ steps.meta.outputs.tags }}
-          inputs: ${{ steps.multiarch-tags.outputs.tags }}
-          push: true
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf 'ghcr.io/dewyer/freecaster-grid@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ghcr.io/dewyer/freecaster-grid:${{ steps.meta.outputs.version }}
+
+      # - name: Metadata for x86_64
+      #   id: meta-x86_64
+      #   uses: docker/metadata-action@v5
+      #   with:
+      #     images: ghcr.io/dewyer/freecaster-grid
+      #     flavor: suffix=-x86_64
+      #     tags: |
+      #       type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      #       type=ref,event=pr
+
+      # - name: Metadata for arm64
+      #   id: meta-arm64
+      #   uses: docker/metadata-action@v5
+      #   with:
+      #     images: ghcr.io/dewyer/freecaster-grid
+      #     flavor: suffix=-arm64
+      #     tags: |
+      #       type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      #       type=ref,event=pr
+
+      # - name: Convert multi-arch tags from newline to comma separated
+      #   id: multiarch-tags
+      #   run: |
+      #     tags_x86_64=$(echo "${{ steps.meta-x86_64.outputs.tags }}" | tr '\n' ',')
+      #     tags_arm64=$(echo "${{ steps.meta-arm64.outputs.tags }}" | tr '\n' ',')
+      #     echo tags="$tags_x86_64,$tags_arm64" >> $GITHUB_OUTPUT
+      # - name: Create and push manifest list
+      #   uses: Noelware/docker-manifest-action@1.0.0
+      #   with:
+      #     tags: ${{ steps.meta.outputs.tags }}
+      #     inputs: ${{ steps.multiarch-tags.outputs.tags }}
+      #     push: true
 
   comment-pr:
     name: Comment on PR with Docker image info
