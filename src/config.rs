@@ -6,12 +6,18 @@ use std::{collections::HashMap, path::PathBuf};
 #[derive(Debug, Deserialize)]
 #[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 pub struct ServerConfig {
-    pub host: String,
+    #[serde(default = "default_ip_address")]
+    pub ip_address: String,
+    pub port: u16,
     #[serde(default)]
     pub ssl: Option<SSLConfig>,
 }
 
-#[derive(Debug, Deserialize)]
+fn default_ip_address() -> String {
+    "0.0.0.0".into()
+}
+
+#[derive(Debug, Deserialize, Clone)]
 #[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 pub struct SSLConfig {
     pub cert_path: String,
@@ -21,10 +27,20 @@ pub struct SSLConfig {
 #[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone, Serialize)]
 #[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 pub struct NodeConfig {
-    pub name: String,
     #[serde(default)]
     pub telegram_handle: Option<String>,
     pub address: String,
+}
+
+impl NodeConfig {
+    pub fn with_name<'a>(&'a self, name: &'a String) -> NamedNodeConfig<'a> {
+        NamedNodeConfig { name, config: self }
+    }
+}
+
+pub struct NamedNodeConfig<'a> {
+    pub name: &'a String,
+    pub config: &'a NodeConfig,
 }
 
 #[derive(Debug, Deserialize, Default, Clone, Copy, Serialize)]
@@ -76,7 +92,8 @@ pub async fn load_config(path: Option<PathBuf>) -> Result<Config> {
     };
     let config = config
         .add_source(
-            config::Environment::with_prefix("FREECASTER")
+            config::Environment::with_prefix("FC")
+                .prefix_separator("_")
                 .separator("__")
                 .convert_case(Case::Snake),
         )

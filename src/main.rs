@@ -3,13 +3,13 @@ mod config;
 mod json_schema;
 mod poller;
 
-use crate::config::{Config, load_config};
+use crate::config::{Config, SSLConfig, load_config};
 
 use crate::poller::{NodeSilence, State, poller};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local, SubsecRound, Utc};
 use env_logger::Builder;
-use log::{LevelFilter, error, info, warn};
+use log::{LevelFilter, info, warn};
 use rand::Rng;
 use rouille::{Request, Server, router, try_or_400};
 use serde::{Deserialize, Serialize};
@@ -117,35 +117,31 @@ async fn main() -> Result<()> {
     let mut config = dbg!(load_config(config_path).await?);
 
     // filter myself out
-    config.nodes.retain(|_, n| *n.name != config.name);
+    config.nodes.retain(|name, _| *name != config.name);
 
     let config = Arc::new(config);
 
     info!("Loaded configuration, this node is: {}", config.name);
 
-    let (key, cert) = if let Some(ssl_config) = &config.server.ssl {
-        let cert = fs::read(&ssl_config.cert_path)
-            .await
-            .with_context(|| "Failed to read certificate")?;
-        let key = fs::read(&ssl_config.key_path)
-            .await
-            .with_context(|| "Failed to read key")?;
-        (Some(key), Some(cert))
-    } else {
-        (None, None)
-    };
-
     let mut js = JoinSet::new();
     let server_config = config.clone();
-    let poller_cert = cert.clone();
+    
     let state = State::new();
     let server_state = state.clone();
 
-    js.spawn(async move {
-        info!("Starting server `{}`", server_config.server.host);
+    let ssl = server_config.server.ssl.clone();
 
-        let host = server_config.server.host.clone();
-        let ssl = server_config.server.ssl.is_some();
+    let poller_cert = if let Some(SSLConfig { cert_path, ..}) = &server_config.server.ssl {
+        Some(fs::read(cert_path).await
+            .with_context(|| format!("Failed to read certificate from {}", cert_path))
+            .expect("Failed to read certificate"))
+    } else {
+        None
+    };
+
+    js.spawn(async move {
+        let listener_address = format!("{}:{}", server_config.server.ip_address, server_config.server.port);
+        info!("Starting server on {}", listener_address);
 
         let webui_enabled = server_config.webui_enabled;
         let router = move |request: &Request| {
@@ -289,18 +285,21 @@ async fn main() -> Result<()> {
             )
         };
 
-        if ssl {
+        if let Some(SSLConfig { cert_path, key_path}) = &ssl {
             info!("Starting server with SSL");
-            if let (Some(cert), Some(key)) = (cert, key) {
-                Server::new_ssl(host, router , cert, key)
-                    .expect("Failed to start server")
-                    .run()
-            } else {
-                error!("No certificate or key provided in SSL mode, aborting");
-            }
+            let cert = fs::read(cert_path).await
+                .with_context(|| format!("Failed to read certificate from {}", cert_path))
+                .expect("Failed to read certificate");
+            let key = fs::read(key_path).await
+                .with_context(|| format!("Failed to read key from {}", key_path))
+                .expect("Failed to read key");
+            
+            Server::new_ssl(listener_address, router , cert, key)
+                .expect("Failed to start server")
+                .run()
         } else {
             info!("Starting server without SSL");
-            Server::new(host, router)
+            Server::new(listener_address, router)
                 .expect("Failed to start server")
                 .run()
         }

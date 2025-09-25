@@ -72,7 +72,8 @@ webui_enabled: true # Enable web UI at /webui
 announcement_mode: telegram # log or telegram
 poll_time: 10s # How often to poll other nodes 10s = 10 seconds, 5m = 5 minutes, 1h = 1 hour
 server:
-  host: "0.0.0.0:3037" # Address to bind to
+  ip_address: "0.0.0.0"
+  port: 3037
   ssl:
     cert_path: "./keys/certificate.pem"
     key_path: "./keys/private_key.pkcs.pem"
@@ -95,28 +96,29 @@ nodes:
 You can fully configure freecaster-grid via environment variables as well.
 This is especially useful when deploying with docker.
 
-All variables are prefixed with `FREECASTER`, and nested fields are separated by `__` (double underscore).
+All variables are prefixed with `FC_`, and nested fields are separated by `__` (double underscore).
 
-Example (dotenv format):
+The above example using environment variables (dotenv format):
 ```env
-FREECASTER__NAME=hal9000
-FREECASTER__TELEGRAM__TOKEN=SOME_VERY_LONG_TOKEN
-FREECASTER__TELEGRAM__CHAT_ID=1234567890
-FREECASTER__SECRET_KEY=SOME_VERY_LONG_SECRET_KEY
-FREECASTER__WEBUI_ENABLED=true
-FREECASTER__ANNOUNCEMENT_MODE=telegram # log or telegram
-FREECASTER__POLL_TIME=10s # How often to poll other nodes 10s = 10 seconds, 5m = 5 minutes, 1h = 1 hour
-FREECASTER__SERVER__HOST=0.0.0.0:3037
-FREECASTER__SERVER__SSL__CERT_PATH=./keys/certificate.pem
-FREECASTER__SERVER__SSL__KEY_PATH=./keys/private_key.pkcs.pem
-FREECASTER__NODES__hal9000__NAME=hal9000
-FREECASTER__NODES__hal9000__ADDRESS=http://hal9000:3037
-FREECASTER__NODES__hal9000__TELEGRAM_HANDLE=hal9000
-FREECASTER__NODES__hal9001__NAME=hal9001
-FREECASTER__NODES__hal9001__ADDRESS=http://hal9001:3037
-FREECASTER__NODES__hal9001__TELEGRAM_HANDLE=hal9001
-FREECASTER__NODES__hal9002__NAME=hal9002
-FREECASTER__NODES__hal9002__ADDRESS=http://hal9002:3037
+FC_NAME=hal9000
+FC_TELEGRAM__TOKEN=SOME_VERY_LONG_TOKEN
+FC_TELEGRAM__CHAT_ID=1234567890
+FC_SECRET_KEY=SOME_VERY_LONG_SECRET_KEY
+FC_WEBUI_ENABLED=true
+FC_ANNOUNCEMENT_MODE=telegram # log or telegram
+FC_POLL_TIME=10s # How often to poll other nodes 10s = 10 seconds, 5m = 5 minutes, 1h = 1 hour
+FC_SERVER__IP_ADDRESS=0.0.0.0
+FC_SERVER__PORT=3037
+FC_SERVER__SSL__CERT_PATH=./keys/certificate.pem
+FC_SERVER__SSL__KEY_PATH=./keys/private_key.pkcs.pem
+FC_NODES__hal9000__NAME=hal9000
+FC_NODES__hal9000__ADDRESS=http://hal9000:3037
+FC_NODES__hal9000__TELEGRAM_HANDLE=hal9000
+FC_NODES__hal9001__NAME=hal9001
+FC_NODES__hal9001__ADDRESS=http://hal9001:3037
+FC_NODES__hal9001__TELEGRAM_HANDLE=hal9001
+FC_NODES__hal9002__NAME=hal9002
+FC_NODES__hal9002__ADDRESS=http://hal9002:3037
 ```
 
 # Testing

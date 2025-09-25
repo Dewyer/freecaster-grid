@@ -1,6 +1,6 @@
 use crate::{
     GridNodeResponse, GridNodeStatus, ObituaryResponse, SilenceBroadcastRequest, StatusResponse,
-    config::{AnnouncementMode, Config, NodeConfig, TelegramConfig},
+    config::{AnnouncementMode, Config, NamedNodeConfig, TelegramConfig},
 };
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -124,8 +124,8 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
     // init state
     {
         let mut gr = state.lock().expect("Failed to lock state");
-        for (_, node) in poller_config.nodes.iter() {
-            gr.node_state.push(NodeState::new(node.name.clone()));
+        for (name, _) in poller_config.nodes.iter() {
+            gr.node_state.push(NodeState::new(name.clone()));
         }
     }
 
@@ -156,11 +156,11 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
             }
 
             // broadcast
-            for (_, node) in poller_config.nodes.iter() {
+            for (node_name, node) in poller_config.nodes.iter() {
                 let done = call_silence_broadcast(
                     &client,
                     &poller_config.name,
-                    node,
+                    node.with_name(&node_name),
                     &poller_config.secret_key,
                     sl,
                 )
@@ -185,29 +185,29 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
 
         info!("Polling nodes @`{time:?}`");
         let mut poll_res = HashMap::new();
-        for (_, node) in poller_config.nodes.iter() {
+        for (node_name, node) in poller_config.nodes.iter() {
             if silenced_nodes_clone
                 .iter()
-                .any(|sl| sl.node_name == node.name)
+                .any(|sl| sl.node_name == *node_name)
             {
-                info!("Silenced node {}", node.name);
+                info!("Silenced node {}", node_name);
                 continue;
             }
 
-            info!("Checking node {}: {}", node.name, node.address);
+            info!("Checking node {}: {}", node_name, node.address);
             let time = Utc::now();
-            let res = poll_node(&client, &poller_config.name, node).await;
-            poll_res.insert(node.clone(), (res, time));
+            let res = poll_node(&client, &poller_config.name, node.with_name(&node_name)).await;
+            poll_res.insert((node_name, node.clone()), (res, time));
         }
 
         let mut up_announcements = vec![];
         let dead_copies = {
             let mut gr = state.lock().expect("Failed to lock state");
-            for (node, (res, time)) in poll_res {
+            for ((node_name, node), (res, time)) in poll_res {
                 let fail_state = gr
                     .node_state
                     .iter_mut()
-                    .find(|fs| fs.name == node.name)
+                    .find(|fs| fs.name == *node_name)
                     .expect("node");
 
                 fail_state.last_poll = Some(time);
@@ -222,7 +222,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
                             fail_state.local_announcement_roll = Some(roll);
                             warn!(
                                 "Node `{}` is dead my roll: `{}`, last fail: {:?}",
-                                node.name, roll, fail_state.last_fail
+                                node_name, roll, fail_state.last_fail
                             );
                         }
                     }
@@ -230,10 +230,10 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
                     // back up
                     if fail_state.is_dead() {
                         if fail_state.announced == Some(poller_config.name.clone()) {
-                            up_announcements.push(node.clone());
+                            up_announcements.push((node_name.clone(), node.clone()));
                         }
                         fail_state.reset();
-                        info!("Node `{}` is back up", node.name);
+                        info!("Node `{}` is back up", node_name);
                     }
                 }
             }
@@ -245,13 +245,19 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
         };
 
         // announce up
-        for up in up_announcements {
+        for (up_name, up_node) in up_announcements {
             match poller_config.announcement_mode {
                 AnnouncementMode::Telegram => {
-                    announce_telegram(&poller_config.name, &up, &poller_config, false).await;
+                    announce_telegram(
+                        &poller_config.name,
+                        up_node.with_name(&up_name),
+                        &poller_config,
+                        false,
+                    )
+                    .await;
                 }
                 AnnouncementMode::Log => {
-                    error!("Announcement!!!: `{}` is back.", up.name);
+                    error!("Announcement!!!: `{}` is back.", up_name);
                 }
             }
         }
@@ -264,24 +270,24 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
             .iter()
             .any(|fs| fs.is_dead() && fs.announced.is_none())
         {
-            for (_, node) in poller_config.nodes.iter() {
-                if dead_copies.iter().any(|fs| fs.name == node.name) {
+            for (node_name, node) in poller_config.nodes.iter() {
+                if dead_copies.iter().any(|fs| fs.name == *node_name) {
                     continue;
                 }
 
                 let Some(orb) = call_obituary(
                     &client,
                     &poller_config.name,
-                    node,
+                    node.with_name(node_name),
                     &poller_config.secret_key,
                 )
                 .await
                 else {
-                    error!("Failed to call Obituary for node `{}`", node.name);
+                    error!("Failed to call Obituary for node `{}`", node_name);
                     continue;
                 };
 
-                obi_response.insert(node.name.clone(), orb);
+                obi_response.insert(node_name.clone(), orb);
             }
         }
 
@@ -378,7 +384,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
                     let node = poller_config
                         .nodes
                         .iter()
-                        .find(|(_, n)| n.name == fs.name)
+                        .find(|(n_name, _)| **n_name == fs.name)
                         .expect("node");
                     announcements.push(node);
                 } else {
@@ -394,13 +400,19 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
             announcements
         };
 
-        for (_, anc) in announcements {
+        for (anc_name, anc) in announcements {
             match poller_config.announcement_mode {
                 AnnouncementMode::Telegram => {
-                    announce_telegram(&poller_config.name, anc, &poller_config, true).await;
+                    announce_telegram(
+                        &poller_config.name,
+                        anc.with_name(anc_name),
+                        &poller_config,
+                        true,
+                    )
+                    .await;
                 }
                 AnnouncementMode::Log => {
-                    error!("Announcement!!!: `{}` is dead.", anc.name);
+                    error!("Announcement!!!: `{}` is dead.", anc_name);
                 }
             }
         }
@@ -423,12 +435,12 @@ async fn check_internet_connection() -> bool {
 async fn make_whatever_logged_http_call<T: DeserializeOwned>(
     client: &Client,
     me: &str,
-    node: &NodeConfig,
+    node: NamedNodeConfig<'_>,
     endpoint: &str,
     purpose: &str,
 ) -> Result<Option<T>> {
     match client
-        .get(format!("{}{}", node.address, endpoint))
+        .get(format!("{}{}", node.config.address, endpoint))
         .header(
             "User-Agent",
             format!("freecaster-grid/{}/{}", env!("CARGO_PKG_VERSION"), me,),
@@ -474,7 +486,8 @@ async fn make_whatever_logged_http_call<T: DeserializeOwned>(
     }
 }
 
-async fn poll_node(client: &Client, me: &str, node: &NodeConfig) -> NodeResult {
+async fn poll_node(client: &Client, me: &str, node: NamedNodeConfig<'_>) -> NodeResult {
+    let node_name = node.name.clone();
     match make_whatever_logged_http_call::<StatusResponse>(client, me, node, "/", "poll status")
         .await
     {
@@ -483,17 +496,17 @@ async fn poll_node(client: &Client, me: &str, node: &NodeConfig) -> NodeResult {
                 "Node `{}`@`{}` is up",
                 correct_response.name, correct_response.version
             );
-            if node.name != correct_response.name {
+            if node_name != correct_response.name {
                 warn!(
                     "Node name mismatch: `{}` != `{}`",
-                    node.name, correct_response.name
+                    node_name, correct_response.name
                 );
             }
 
             NodeResult { failing: false }
         }
         Ok(None) => {
-            warn!("Node `{}` is up but weird", node.name);
+            warn!("Node `{}` is up but weird", node_name);
 
             NodeResult { failing: false }
         }
@@ -504,7 +517,7 @@ async fn poll_node(client: &Client, me: &str, node: &NodeConfig) -> NodeResult {
 async fn call_obituary(
     client: &Client,
     me: &str,
-    node: &NodeConfig,
+    node: NamedNodeConfig<'_>,
     key: &str,
 ) -> Option<ObituaryResponse> {
     make_whatever_logged_http_call::<ObituaryResponse>(
@@ -522,7 +535,7 @@ async fn call_obituary(
 async fn call_silence_broadcast(
     client: &Client,
     me: &str,
-    node: &NodeConfig,
+    node: NamedNodeConfig<'_>,
     key: &str,
     silence: &NodeSilence,
 ) -> bool {
@@ -531,7 +544,7 @@ async fn call_silence_broadcast(
         silence.id, silence.silent_until, node.name
     );
     let res = client
-        .post(format!("{}/silence-broadcast/{key}", node.address))
+        .post(format!("{}/silence-broadcast/{key}", node.config.address))
         .json(&SilenceBroadcastRequest {
             id: silence.id,
             node_name: silence.node_name.clone(),
@@ -553,8 +566,13 @@ async fn call_silence_broadcast(
     res.status().is_success()
 }
 
-async fn announce_telegram(me: &str, target: &NodeConfig, config: &Arc<Config>, is_dead: bool) {
-    let end = if let Some(tg) = target.telegram_handle.as_ref() {
+async fn announce_telegram(
+    me: &str,
+    target: NamedNodeConfig<'_>,
+    config: &Arc<Config>,
+    is_dead: bool,
+) {
+    let end = if let Some(tg) = target.config.telegram_handle.as_ref() {
         format!("- @{tg}")
     } else {
         "".to_string()
