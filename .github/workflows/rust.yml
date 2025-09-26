@@ -27,25 +27,31 @@ jobs:
           - task: test
             name: Test
             cargo_cmd: test
-          - task: fmt
-            name: Format
-            cargo_cmd: fmt -- --check
           - task: clippy
             name: Clippy
             cargo_cmd: clippy -- -D warnings
+          - task: fmt
+            name: Format
+            cargo_cmd: fmt -- --check
+            runner: ubuntu-latest
           - task: udeps
             name: Unused Dependencies
             cargo_cmd: +nightly udeps --all-targets --all-features
-        
+            runner: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: ${{ matrix.task == 'udeps' && 'nightly' || 'stable' }}
+          # matrix.task == 'udeps' ? 'nightly' : null
+          toolchain: ${{ matrix.task == 'udeps' && 'nightly' || null }}
           components: clippy, rustfmt
+
       - uses: taiki-e/install-action@cargo-udeps
         name: Install cargo-udeps
         if: ${{ matrix.task == 'udeps' }}
+
       - name: ${{ matrix.name }}
         run: cargo ${{ matrix.cargo_cmd }}
