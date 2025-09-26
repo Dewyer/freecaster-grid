@@ -117,6 +117,7 @@ jobs:
           images: ${{ env.REGISTRY_IMAGE }}
           tags: |
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_call' }}
+            type=raw,value=main,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             type=semver,pattern={{version}},value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_call' }}
             type=semver,pattern={{major}}.{{minor}},value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_call' }}
             type=semver,pattern={{major}},value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_call' }}
