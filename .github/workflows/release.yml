@@ -132,6 +132,8 @@ jobs:
           tag: ${{ needs.gather_info.outputs.new_tag }}
 
   build_release:
+    if: ${{ github.event.inputs.dry_run == 'false' && needs.gather_info.outputs.version_update_needed == 'false'}}
+    needs: gather_info
     name: Build release artifacts on ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     strategy:
