@@ -14,8 +14,8 @@ COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json --bin freecaster-grid
 # Build application
 COPY . .
-RUN cargo build --release --bin freecaster-grid
-RUN mv target/release/freecaster-grid freecaster-grid
+RUN cargo build --release --bin freecaster-grid && \
+    mv target/release/freecaster-grid freecaster-grid
 
 FROM alpine:3.22 AS runtime
 
