@@ -38,6 +38,11 @@ jobs:
             name: Unused Dependencies
             cargo_cmd: +nightly udeps --all-targets --all-features
             runner: ubuntu-latest
+        exclude:
+          - runner: ubuntu-24.04-arm
+            task: fmt
+          - runner: ubuntu-24.04-arm
+            task: udeps
 
     steps:
       - uses: actions/checkout@v4
