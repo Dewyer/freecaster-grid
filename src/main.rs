@@ -79,7 +79,6 @@ pub struct SilenceBroadcastRequest {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("freecaster-grid v{VERSION}");
     dotenvy::dotenv().ok();
     Builder::new()
         .format(|buf, record| {
