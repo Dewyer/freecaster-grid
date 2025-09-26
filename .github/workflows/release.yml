@@ -1,0 +1,261 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version increment to apply"
+        required: true
+        default: patch
+        type: choice
+        options: [major, minor, patch]
+      dry_run:
+        description: "Dry run (no tag push or release creation)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  gather-info:
+    name: Gather info for release from main
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+      new_tag: ${{ steps.version.outputs.new_tag }}
+      version_update_needed: ${{ steps.check_version.outputs.version_update_needed }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main with full history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Fetch tags
+        run: git fetch --tags --force
+
+      - name: Compute next version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          bump="${{ github.event.inputs.bump }}"
+
+          # Get latest semver tag (supports vX.Y.Z or X.Y.Z). Defaults to 0.0.0 if none.
+          mapfile -t tags < <(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' '[0-9]*.[0-9]*.[0-9]*' | sed 's/^v//' | sort -V)
+          latest="0.0.0"
+          if (( ${#tags[@]} > 0 )); then
+            latest="${tags[-1]}"
+          fi
+
+          IFS='.' read -r major minor patch <<<"$latest"
+          case "$bump" in
+            major)
+              major=$((major + 1)); minor=0; patch=0;;
+            minor)
+              minor=$((minor + 1)); patch=0;;
+            patch)
+              patch=$((patch + 1));;
+            *) echo "Invalid bump type: $bump" >&2; exit 1;;
+          esac
+
+          new_version="${major}.${minor}.${patch}"
+          echo "new_version=${new_version}" >> "$GITHUB_OUTPUT"
+          echo "new_tag=v${new_version}" >> "$GITHUB_OUTPUT"
+
+      - name: Check version in Cargo.toml
+        shell: bash
+        id: check_version
+        run: |
+          set -euo pipefail
+          pip install tomlkit
+          python <<EOPYTHON
+          import tomlkit
+          import os
+          from pathlib import Path
+          cargo_toml_path = Path("Cargo.toml")
+          doc = tomlkit.parse(cargo_toml_path.read_text())
+          if doc["package"]["version"] != "${{ steps.version.outputs.new_version }}":
+              print(f"Version in Cargo.toml ('package'.'version') does not match computed version (${{ steps.version.outputs.new_version }}).")
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write("version_update_needed=true\n")
+          else:
+              print(f"Version in Cargo.toml matches computed version: ${{ steps.version.outputs.new_version }}")
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write("version_update_needed=false\n")
+          EOPYTHON
+
+  dry-run-release:
+    if: ${{ github.event.inputs.dry_run == 'true' }}
+    name: Perform dry run or actual release
+    needs: gather-info
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dry run preview
+        run: |
+          echo "Dry run mode enabled: no tag or release will be created."
+          echo "Target branch: main"
+          echo "Computed next tag: ${{ needs.gather-info.outputs.new_tag }}"
+          echo "Would tag HEAD of main and create a release with generated notes."
+          echo "Cargo.toml version update needed: ${{ needs.gather-info.outputs.version_update_needed }}"
+
+  update-version:
+    if: ${{ github.event.inputs.dry_run != 'true' && needs.gather-info.outputs.version_update_needed == 'true'}}
+    name: Update version in Cargo.toml and create PR
+    needs: gather-info
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Update version in Cargo.toml
+        shell: bash
+        run: |
+          set -euo pipefail
+          pip install tomlkit
+          python <<EOPYTHON
+          import tomlkit
+          from pathlib import Path
+          cargo_toml_path = Path("Cargo.toml")
+          doc = tomlkit.parse(cargo_toml_path.read_text())
+          doc["package"]["version"] = "${{ needs.gather-info.outputs.new_version }}"
+          cargo_toml_path.write_text(tomlkit.dumps(doc))
+          EOPYTHON
+          git diff Cargo.toml
+
+      - name: Create pull request to main
+        uses: peter-evans/create-pull-request@v7
+        id: create_pr
+        with:
+          commit-message: "Bump version to ${{ needs.gather-info.outputs.new_version }}"
+          title: "Bump version to ${{ needs.gather-info.outputs.new_version }}"
+          body: |
+            This PR bumps the version in Cargo.toml to ${{ needs.gather-info.outputs.new_version }}.
+          base: main
+          draft: false
+          delete-branch: true
+
+  build-docker-image:
+    if: ${{ github.event.inputs.dry_run != 'true' && needs.gather-info.outputs.version_update_needed == 'false'}}
+    name: Build Docker image for updated version
+    needs: gather-info
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.build-image.outputs.image_tag }}
+    steps:
+      - name: Build and push Docker image
+        uses: ./.github/workflows/docker-publish.yml
+        id: build-image
+        with:
+          tag: ${{ needs.gather-info.outputs.new_tag }}
+
+  build-release:
+    name: Build release artifacts on ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+            rust_target: x86_64-unknown-linux-musl
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            rust_target: aarch64-unknown-linux-musl
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install build dependencies
+        run: cargo build --target ${{ matrix.rust_target }} --release
+
+      - name: Create release artifacts
+        id: create-artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cp "target/${{ matrix.rust_target }}/release/freecaster-grid" "artifacts/freecaster-grid-${{ matrix.arch }}"
+          chmod +x "artifacts/freecaster-grid-${{ matrix.arch }}"
+          tar -czvf "artifacts/freecaster-grid-${{ matrix.arch }}.tar.gz" -C artifacts "freecaster-grid-${{ matrix.arch }}"
+          sha256sum "artifacts/freecaster-grid-${{ matrix.arch }}.tar.gz" > "artifacts/freecaster-grid-${{ matrix.arch }}.tar.gz.sha256"
+
+      - name: List artifacts
+        run: ls -l artifacts
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: "release-artifacts-${{ matrix.arch }}"
+          path: |
+            artifacts/freecaster-grid-${{ matrix.arch }}.tar.gz
+            artifacts/freecaster-grid-${{ matrix.arch }}.tar.gz.sha256
+
+  perform-release:
+    if: ${{ github.event.inputs.dry_run != 'true' && needs.gather-info.outputs.version_update_needed == 'false'}}
+    name: Perform Release
+    needs:
+      - gather-info
+      - build-docker-image
+      - build-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          pattern: release-artifacts-*
+          path: artifacts
+
+      - name: Tag main and push tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ needs.gather-info.outputs.new_tag }}"
+          # Ensure we are on main's HEAD
+          git checkout --progress --force main
+          git pull --ff-only origin main
+
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "Tag ${tag} already exists. Aborting." >&2
+            exit 1
+          fi
+
+          git tag -a "${tag}" -m "Release ${tag}"
+          git push origin "${tag}"
+
+      - name: Create release with generated notes
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.gather-info.outputs.new_tag }}
+          target_commitish: main
+          name: ${{ needs.gather-info.outputs.new_tag }}
+          generate_release_notes: true
+          draft: true
+          body: |
+            > This is a draft release for version ${{ needs.gather-info.outputs.new_tag }}.
+            > Please review the release notes and publish when ready.
+
+            Docker image is available at: 
+            ```
+            ${{ needs.build-docker-image.outputs.image_tag }}
+            ```
+          files: artifacts/*
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
