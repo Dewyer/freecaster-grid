@@ -13,7 +13,7 @@ RUN cargo chef prepare --recipe-path recipe.json --bin freecaster-grid
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
 # Build dependencies - this is the caching Docker layer!
-RUN cargo chef cook --release --target $(uname -p)-unknown-linux-musl --recipe-path recipe.json
+RUN cargo chef cook --release --target $(uname -p)-unknown-linux-musl --recipe-path recipe.json --bin freecaster-grid
 # Build application
 COPY . .
 RUN cargo build --release --bin freecaster-grid --target $(uname -p)-unknown-linux-musl && \
