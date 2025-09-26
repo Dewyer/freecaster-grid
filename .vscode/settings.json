@@ -1,0 +1,6 @@
+{
+    // Uncomment the following line to enable the JSON schema feature for rust-analyzer
+    "rust-analyzer.cargo.features": [
+        // "json_schema"
+    ]
+}

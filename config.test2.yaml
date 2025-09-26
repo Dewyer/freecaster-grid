@@ -1,19 +1,17 @@
 name: Test2
-telegram_token: "test"
-telegram_chat_id: 0
 announcement_mode: log
 secret_key: almafa
 
 server:
-  host: "localhost:4243"
-  ssl: false
-  cert_path: "./keys/certificate.pem"
-  key_path: "./keys/private_key.pkcs.pem"
+  port: 4243
+  ssl:
+    cert_path: "./keys/certificate.pem"
+    key_path: "./keys/private_key.pkcs.pem"
 
 nodes:
-  - name: "Test1"
+  test1:
     address: "http://localhost:4242"
-  - name: "Test2"
+  test2:
     address: "http://localhost:4243"
-  - name: "Test3"
+  test3:
     address: "http://localhost:4244"
