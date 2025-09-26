@@ -251,7 +251,7 @@ jobs:
             > This is a draft release for version ${{ needs.gather-info.outputs.new_tag }}.
             > Please review the release notes and publish when ready.
 
-            Docker image is available at: 
+            Docker image is available at:
             ```
             ${{ needs.build-docker-image.outputs.image_tag }}
             ```
