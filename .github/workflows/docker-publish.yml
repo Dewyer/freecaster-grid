@@ -6,6 +6,16 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      tag:
+        description: "Tag to use for the image"
+        required: true
+        type: string
+    outputs:
+      tags:
+        description: "Tags applied to the image"
+        value: ${{ jobs.unify-manifests.outputs.tags }}
 
 env:
   REGISTRY_IMAGE: ghcr.io/dewyer/freecaster-grid
@@ -106,7 +116,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY_IMAGE }}
           tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'workflow_call' }}
+            type=semver,pattern={{version}},value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_call' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_call' }}
+            type=semver,pattern={{major}},value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_call' }}
             type=ref,event=pr
             type=sha
           labels: |
