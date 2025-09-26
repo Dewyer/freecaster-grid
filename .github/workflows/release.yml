@@ -67,7 +67,7 @@ jobs:
       - name: Check version in Cargo.toml
         shell: bash
         id: check_version
-        run: version_update_needed=$(uv run scripts/check_cargo_version.py ${{ steps.version.outputs.new_version }}) >> "$GITHUB_OUTPUT"
+        run: echo "version_update_needed=$(uv run scripts/check_cargo_version.py ${{ steps.version.outputs.new_version }})" >> "$GITHUB_OUTPUT"
 
   dry_run_release:
     if: ${{ github.event.inputs.dry_run == 'true' }}
