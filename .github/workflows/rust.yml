@@ -39,6 +39,4 @@ jobs:
         name: Install cargo-udeps
         if: matrix.name == 'Unused Dependencies'
       - name: Build
-        run: cargo build --verbose
-      - name: Run tests
-        run: cargo test --verbose
+        run: cargo ${{ matrix.cargo_cmd }}
