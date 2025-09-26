@@ -1,8 +1,6 @@
-FROM clux/muslrust:stable AS chef
-USER root
+FROM rust:1.89-alpine3.22 AS chef
+RUN apk add curl musl-dev build-base
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | sh
-ADD rust-toolchain.toml .
-RUN rustup target add $(uname -p)-unknown-linux-musl
 RUN cargo binstall cargo-chef -y
 WORKDIR /app
 
@@ -13,13 +11,13 @@ RUN cargo chef prepare --recipe-path recipe.json --bin freecaster-grid
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
 # Build dependencies - this is the caching Docker layer!
-RUN cargo chef cook --release --target $(uname -p)-unknown-linux-musl --recipe-path recipe.json --bin freecaster-grid
+RUN cargo chef cook --release --recipe-path recipe.json --bin freecaster-grid
 # Build application
 COPY . .
-RUN cargo build --release --bin freecaster-grid --target $(uname -p)-unknown-linux-musl && \
-    mv target/$(uname -p)-unknown-linux-musl/release/freecaster-grid freecaster-grid
+RUN cargo build --release --bin freecaster-grid
+RUN mv target/release/freecaster-grid freecaster-grid
 
-FROM alpine:3.21.3 AS runtime
+FROM alpine:3.22 AS runtime
 
 RUN apk add --no-cache \
     ca-certificates \
