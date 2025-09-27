@@ -25,7 +25,7 @@ jobs:
       new_version: ${{ steps.version.outputs.new_version }}
       new_tag: ${{ steps.version.outputs.new_tag }}
       version_update_needed: ${{ steps.check_version.outputs.version_update_needed }}
-    runs-on: &runner ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repo with full history
         uses: actions/checkout@v5
@@ -76,7 +76,7 @@ jobs:
     if: ${{ github.event.inputs.dry_run == 'true' }}
     name: Perform dry run or actual release
     needs: gather_info
-    runs-on: *runner
+    runs-on: ubuntu-latest
     steps:
       - name: Dry run preview
         run: |
@@ -89,7 +89,7 @@ jobs:
     if: ${{ github.event.inputs.dry_run == 'false' && needs.gather_info.outputs.version_update_needed == 'true'}}
     name: Update version in Cargo.toml and create PR
     needs: gather_info
-    runs-on: *runner
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -127,15 +127,12 @@ jobs:
     if: ${{ github.event.inputs.dry_run == 'false' && needs.gather_info.outputs.version_update_needed == 'false'}}
     name: Build Docker image for updated version
     needs: gather_info
-    runs-on: *runner
+    runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.build_image.outputs.image_tag }}
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v5
-
       - name: Build and push Docker image
-        uses: ./.github/workflows/docker-publish.yml
+        uses: Dewyer/freecaster-grid/.github/workflows/docker-publish.yml@main
         id: build_image
         with:
           tag: ${{ needs.gather_info.outputs.new_tag }}
@@ -197,7 +194,7 @@ jobs:
       - gather_info
       - build_docker_image
       - build_release
-    runs-on: *runner
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
