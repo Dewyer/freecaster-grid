@@ -153,36 +153,18 @@ jobs:
       contents: read
       pull-requests: write
     steps:
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
+
       - name: Generate Docker image tags comment body
         id: generate-comment
-        uses: actions/github-script@v7
-        with:
-          script: |
-            // Collect newline-separated tags from previous job output
-            const raw = `${{ needs.unify-manifests.outputs.tags }}`;
-            const tags = raw.split('\n').map(s => s.trim()).filter(Boolean);
+        run: |
+          set -euo pipefail
+          echo ${{ needs.unify-manifests.outputs.tags }} | uv run scripts/generate_docker_comment.py > comment.md
+          echo "body=$(cat comment.md)" >> $GITHUB_OUTPUT
 
-            if (tags.length === 0) {
-              core.info('No tags found to comment. Skipping.');
-              core.setOutput('body', '');
-              return;
-            }
-
-            const list = tags.map(t => `- \`${t}\``).join('\n');
-            const pullExample = `docker pull ${tags[0]}`;
-
-            const body = [
-              'Docker image(s) for this PR are available:',
-              '',
-              list,
-              '',
-              'Try locally:',
-              '```',
-              pullExample,
-              '```'
-            ].join('\n');
-
-            core.setOutput('body', body);
       - name: Find Comment
         uses: peter-evans/find-comment@v3
         id: fc
@@ -192,14 +174,14 @@ jobs:
           body-includes: Docker image(s) for this PR are available
 
       - name: Create comment
-        if: steps.fc.outputs.comment-id == '' && steps.generate-comment.outputs.body != ''
+        if: steps.fc.outputs.comment-id == ''
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: ${{ steps.generate-comment.outputs.body }}
 
       - name: Update comment
-        if: steps.fc.outputs.comment-id != '' && steps.generate-comment.outputs.body != ''
+        if: steps.fc.outputs.comment-id != ''
         uses: peter-evans/create-or-update-comment@v4
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
