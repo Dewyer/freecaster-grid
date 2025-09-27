@@ -169,7 +169,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "${{ needs.unify-manifests.outputs.tags }}" | uv run scripts/gen_docker_pr_preview.py > comment.md
-          echo "body=$(cat comment.md)" >> $GITHUB_OUTPUT
+          echo "body=$(cat comment.md)" >> $GITHUB_STEP_SUMMARY
 
       - name: Find Comment
         uses: peter-evans/find-comment@v3
@@ -184,12 +184,12 @@ jobs:
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          body: ${{ steps.generate-comment.outputs.body }}
+          body-path: comment.md
 
       - name: Update comment
         if: steps.fc.outputs.comment-id != ''
         uses: peter-evans/create-or-update-comment@v4
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
-          body: ${{ steps.generate-comment.outputs.body }}
+          body-path: comment.md
           edit-mode: replace
