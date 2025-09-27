@@ -125,10 +125,10 @@ jobs:
 
   build_docker_image:
     if: ${{ github.event.inputs.dry_run == 'false' && needs.gather_info.outputs.version_update_needed == 'false'}}
-    name: Build Docker image for updated version
     needs: gather_info
-    runs-on: ubuntu-latest
     uses: ./.github/workflows/docker-publish.yml
+    with:
+      tag: ${{ needs.gather_info.outputs.new_tag }}
 
   build_release:
     if: ${{ github.event.inputs.dry_run == 'false' && needs.gather_info.outputs.version_update_needed == 'false'}}
@@ -231,7 +231,7 @@ jobs:
 
             Docker image is available at:
             ```
-            ${{ needs.build_docker_image.outputs.tags[0] }}
+            ${{ needs.build_docker_image.outputs.tags }}
             ```
           files: artifacts/*
 
