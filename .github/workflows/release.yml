@@ -135,7 +135,7 @@ jobs:
       packages: write
       pull-requests: write
     with:
-      tag: ${{ needs.gather_info.outputs.new_tag }}
+      tag: ${{ github.action.needs.gather_info.outputs.new_tag }}
 
   build_release:
     if: ${{ github.event.inputs.dry_run == 'false' && needs.gather_info.outputs.version_update_needed == 'false'}}
@@ -191,7 +191,6 @@ jobs:
     if: ${{ github.event.inputs.dry_run != 'true' && needs.gather_info.outputs.version_update_needed == 'false'}}
     name: Perform Release
     needs:
-      - gather_info
       - build_docker_image
       - build_release
     runs-on: ubuntu-latest
