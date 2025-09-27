@@ -191,6 +191,7 @@ jobs:
     if: ${{ github.event.inputs.dry_run != 'true' && needs.gather_info.outputs.version_update_needed == 'false'}}
     name: Perform Release
     needs:
+      - gather_info
       - build_docker_image
       - build_release
     runs-on: ubuntu-latest
