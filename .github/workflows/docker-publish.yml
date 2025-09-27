@@ -12,6 +12,11 @@ on:
         description: "Tag to use for the image"
         required: true
         type: string
+      is_latest:
+        description: "Whether this tag is the latest release"
+        required: false
+        default: false
+        type: boolean
     outputs:
       tags:
         description: "Tags applied to the image"
@@ -124,11 +129,11 @@ jobs:
         with:
           images: ${{ env.REGISTRY_IMAGE }}
           tags: |
-            type=raw,value=latest,enable=${{ github.event_name == 'workflow_call' }}
+            type=raw,value=latest,enable=${{ inputs.is_latest }}
             type=raw,value=main,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-            type=semver,pattern={{version}},value=${{ github.event.inputs.tag }},enable=${{ github.event.inputs.tag != '' }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ github.event.inputs.tag }},enable=${{ github.event.inputs.tag != '' }}
-            type=semver,pattern={{major}},value=${{ github.event.inputs.tag }},enable=${{ github.event.inputs.tag != '' }}
+            type=semver,pattern={{version}},value=${{ inputs.tag }},enable=${{ inputs.tag != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag }},enable=${{ inputs.tag != '' }}
+            type=semver,pattern={{major}},value=${{ inputs.tag }},enable=${{ inputs.tag != '' }}
             type=ref,event=pr
             type=sha
           labels: |
