@@ -81,19 +81,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Dry run preview
+        shell: bash
         run: |
           set -euo pipefail
-          echo << EOMD
+          # Write the dry run summary header block
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOMD'
           ### Dry Run Release Preview
           This is a dry run of the release process. No tags or releases have been created.
           - Target branch: ${{ github.ref_name }}
           - Computed next tag: ${{ needs.gather_info.outputs.new_tag }}
           - Cargo.toml version update needed: ${{ needs.gather_info.outputs.version_update_needed }}
-          EOMD >> $GITHUB_STEP_SUMMARY
+          EOMD
+
+          # Append the next action depending on whether a version bump is needed
           if [ "${{ needs.gather_info.outputs.version_update_needed }}" == "true" ]; then
-            echo "- A pull request will be created to update the version in Cargo.toml to ${{ needs.gather_info.outputs.new_version }}." >> $GITHUB_STEP_SUMMARY
+            echo "- A pull request will be created to update the version in Cargo.toml to ${{ needs.gather_info.outputs.new_version }}." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "- No version update needed in Cargo.toml. Proceeding to create release ${{ needs.gather_info.outputs.new_tag }}." >> $GITHUB_STEP_SUMMARY
+            echo "- No version update needed in Cargo.toml. Proceeding to create release ${{ needs.gather_info.outputs.new_tag }}." >> "$GITHUB_STEP_SUMMARY"
           fi
 
   update_version:
