@@ -158,11 +158,16 @@ jobs:
         with:
           enable-cache: false
 
+      - name: Checkout script
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: scripts/gen_docker_pr_preview.py
+
       - name: Generate Docker image tags comment body
         id: generate-comment
         run: |
           set -euo pipefail
-          echo ${{ needs.unify-manifests.outputs.tags }} | uv run scripts/generate_docker_comment.py > comment.md
+          echo ${{ needs.unify-manifests.outputs.tags }} | uv run scripts/gen_docker_pr_preview.py > comment.md
           echo "body=$(cat comment.md)" >> $GITHUB_OUTPUT
 
       - name: Find Comment
