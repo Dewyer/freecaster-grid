@@ -128,19 +128,7 @@ jobs:
     name: Build Docker image for updated version
     needs: gather_info
     runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.build_image.outputs.image_tag }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            .github/workflows/docker-publish.yml
-      - name: Build and push Docker image
-        uses: ./.github/workflows/docker-publish.yml
-        id: build_image
-        with:
-          tag: ${{ needs.gather_info.outputs.new_tag }}
+    uses: ./.github/workflows/docker-publish.yml
 
   build_release:
     if: ${{ github.event.inputs.dry_run == 'false' && needs.gather_info.outputs.version_update_needed == 'false'}}
@@ -243,7 +231,7 @@ jobs:
 
             Docker image is available at:
             ```
-            ${{ needs.build_docker_image.outputs.image_tag }}
+            ${{ needs.build_docker_image.outputs.tags[0] }}
             ```
           files: artifacts/*
 
