@@ -82,10 +82,19 @@ jobs:
     steps:
       - name: Dry run preview
         run: |
-          echo "Dry run mode enabled: no tag or release will be created."
-          echo "Target branch: ${{ github.ref_name }}"
-          echo "Computed next tag: ${{ needs.gather_info.outputs.new_tag }}"
-          echo "Cargo.toml version update needed: ${{ needs.gather_info.outputs.version_update_needed }}"
+          set -euo pipefail
+          echo << EOMD
+          ### Dry Run Release Preview
+          This is a dry run of the release process. No tags or releases have been created.
+          - Target branch: ${{ github.ref_name }}
+          - Computed next tag: ${{ needs.gather_info.outputs.new_tag }}
+          - Cargo.toml version update needed: ${{ needs.gather_info.outputs.version_update_needed }}
+          EOMD >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.gather_info.outputs.version_update_needed }}" == "true" ]; then
+            echo "- A pull request will be created to update the version in Cargo.toml to ${{ needs.gather_info.outputs.new_version }}." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- No version update needed in Cargo.toml. Proceeding to create release ${{ needs.gather_info.outputs.new_tag }}." >> $GITHUB_STEP_SUMMARY
+          fi
 
   update_version:
     if: ${{ github.event.inputs.dry_run == 'false' && needs.gather_info.outputs.version_update_needed == 'true'}}
