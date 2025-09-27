@@ -112,7 +112,11 @@ jobs:
 
       - name: Inspect inputs
         run: |
-          echo "Input tag: '${{ github.event.inputs.tag }}'"
+          echo "Input tag: '${{ inputs.tag }}'"
+          if [ -z "${{ inputs.tag }}" ]; then
+            echo "Error: Input 'tag' is required."
+            exit 1
+          fi
 
       - name: Gather metadata (tags, labels) for Docker
         id: meta
