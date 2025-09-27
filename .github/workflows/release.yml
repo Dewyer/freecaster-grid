@@ -17,6 +17,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  packages: write
 
 jobs:
   gather_info:
@@ -127,6 +128,9 @@ jobs:
     if: ${{ github.event.inputs.dry_run == 'false' && needs.gather_info.outputs.version_update_needed == 'false'}}
     needs: gather_info
     uses: ./.github/workflows/docker-publish.yml
+    permissions:
+      contents: read
+      packages: write
     with:
       tag: ${{ needs.gather_info.outputs.new_tag }}
 
