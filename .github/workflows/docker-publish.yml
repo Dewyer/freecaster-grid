@@ -121,7 +121,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY_IMAGE }}
           tags: |
-            type=raw,value=latest,enable=${{ inputs.is_latest }}
+            type=raw,value=latest,enable=${{ inputs.is_latest || false }}
             type=raw,value=main,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             type=semver,pattern={{version}},value=${{ inputs.tag }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag }}
@@ -132,6 +132,8 @@ jobs:
             org.opencontainers.image.source=${{ github.repository }}
             org.opencontainers.image.url=https://github.com/dewyer/freecaster-grid
             org.opencontainers.image.revision=${{ github.sha }}
+          flavor: |
+            latest=false
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
         run: |
