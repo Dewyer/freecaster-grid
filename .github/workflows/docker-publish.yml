@@ -169,7 +169,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "${{ needs.unify-manifests.outputs.tags }}" | uv run scripts/gen_docker_pr_preview.py > comment.md
-          echo "body=$(cat comment.md)" >> $GITHUB_STEP_SUMMARY
+          cat comment.md >> $GITHUB_STEP_SUMMARY
 
       - name: Find Comment
         uses: peter-evans/find-comment@v3
