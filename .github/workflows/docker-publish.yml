@@ -112,7 +112,7 @@ jobs:
 
       - name: Inspect inputs
         run: |
-          echo "Inputs: '${{ github.event.inputs }}'"
+          echo "Input tag: '${{ github.event.inputs.tag }}'"
 
       - name: Gather metadata (tags, labels) for Docker
         id: meta
