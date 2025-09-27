@@ -161,7 +161,8 @@ jobs:
       - name: Checkout script
         uses: actions/checkout@v5
         with:
-          sparse-checkout: scripts/gen_docker_pr_preview.py
+          sparse-checkout: |
+            scripts/gen_docker_pr_preview.py
 
       - name: Generate Docker image tags comment body
         id: generate-comment
