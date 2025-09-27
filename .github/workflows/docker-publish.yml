@@ -153,16 +153,16 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: false
-
       - name: Checkout script
         uses: actions/checkout@v5
         with:
           sparse-checkout: |
             scripts/gen_docker_pr_preview.py
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
 
       - name: Generate Docker image tags comment body
         id: generate-comment
