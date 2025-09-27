@@ -131,6 +131,9 @@ jobs:
     outputs:
       image_tag: ${{ steps.build_image.outputs.image_tag }}
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
       - name: Build and push Docker image
         uses: ./.github/workflows/docker-publish.yml
         id: build_image
