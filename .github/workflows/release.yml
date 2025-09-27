@@ -132,7 +132,7 @@ jobs:
       image_tag: ${{ steps.build_image.outputs.image_tag }}
     steps:
       - name: Build and push Docker image
-        uses: Dewyer/freecaster-grid/.github/workflows/docker-publish.yml@main
+        uses: ./.github/workflows/docker-publish.yml
         id: build_image
         with:
           tag: ${{ needs.gather_info.outputs.new_tag }}
