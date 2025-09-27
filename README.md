@@ -49,6 +49,14 @@ docker pull ghcr.io/dewyer/freecaster-grid:latest
 ```
 For an example docker compose configuration, see the [compose.yaml file](examples/compose.yaml).
 
+We publish multi-arch images for `linux/amd64` and `linux/arm64`.
+
+For the release tags, we use [semantic versioning](https://semver.org/), so you can pin to a specific major, minor or patch version if you want to.
+If you'd like to get updates automatically, but avoid breaking changes, you can pin to a specific major version like `ghcr.io/dewyer/freecaster-grid:0.3`.
+This will get you all `0.3.x` releases, but not `0.4.0`.
+
+If you want to try the bleeding edge, you can use the `main` tag, which is built from the main branch on every push.
+
 ## Configuration
 Example config:
 ```yaml
