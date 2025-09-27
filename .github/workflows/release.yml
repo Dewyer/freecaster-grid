@@ -226,6 +226,13 @@ jobs:
           git tag -a "${tag}" -m "Release ${tag}"
           git push origin "${tag}"
 
+      - name: Get first Docker image tag
+        id: docker_tag
+        run: |
+          tags="${{ needs.build_docker_image.outputs.tags }}"
+          first_tag=$(echo "$tags" | head -n1)
+          echo "tag=$first_tag" >> "$GITHUB_OUTPUT"
+
       - name: Create release with generated notes
         uses: softprops/action-gh-release@v2
         with:
@@ -239,7 +246,7 @@ jobs:
 
             Docker image is available at:
             ```
-            ${{ needs.build_docker_image.outputs.tags }}
+            ${{ steps.docker_tag.outputs.tag }}
             ```
           files: artifacts/*
 
