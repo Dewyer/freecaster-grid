@@ -125,6 +125,7 @@ jobs:
           delete-branch: true
 
   build_docker_image:
+    name: Build Docker image for updated version
     if: ${{ github.event.inputs.dry_run == 'false' && needs.gather_info.outputs.version_update_needed == 'false'}}
     needs: gather_info
     uses: ./.github/workflows/docker-publish.yml
