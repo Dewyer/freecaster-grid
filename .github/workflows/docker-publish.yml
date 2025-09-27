@@ -115,14 +115,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Inspect inputs
-        run: |
-          echo "Input tag: '${{ inputs.tag }}'"
-          if [ -z "${{ inputs.tag }}" ]; then
-            echo "Error: Input 'tag' is required."
-            exit 1
-          fi
-
       - name: Gather metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
