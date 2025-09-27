@@ -168,7 +168,7 @@ jobs:
         id: generate-comment
         run: |
           set -euo pipefail
-          echo ${{ needs.unify-manifests.outputs.tags }} | uv run scripts/gen_docker_pr_preview.py > comment.md
+          echo "${{ needs.unify-manifests.outputs.tags }}" | uv run scripts/gen_docker_pr_preview.py > comment.md
           echo "body=$(cat comment.md)" >> $GITHUB_OUTPUT
 
       - name: Find Comment
