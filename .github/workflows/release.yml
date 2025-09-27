@@ -135,7 +135,7 @@ jobs:
       packages: write
       pull-requests: write
     with:
-      tag: ${{ github.action.needs.gather_info.outputs.new_tag }}
+      tag: "${{ needs.gather_info.outputs.new_tag }}"
 
   build_release:
     if: ${{ github.event.inputs.dry_run == 'false' && needs.gather_info.outputs.version_update_needed == 'false'}}
