@@ -131,6 +131,11 @@ jobs:
     outputs:
       image_tag: ${{ steps.build_image.outputs.image_tag }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/workflows/docker-publish.yml
       - name: Build and push Docker image
         uses: ./.github/workflows/docker-publish.yml
         id: build_image
