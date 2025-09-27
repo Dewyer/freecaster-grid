@@ -123,9 +123,9 @@ jobs:
           tags: |
             type=raw,value=latest,enable=${{ inputs.is_latest }}
             type=raw,value=main,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-            type=semver,pattern={{version}},value=${{ inputs.tag }},enable=${{ inputs.tag != '' }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag }},enable=${{ inputs.tag != '' }}
-            type=semver,pattern={{major}},value=${{ inputs.tag }},enable=${{ inputs.tag != '' }}
+            type=semver,pattern={{version}},value=${{ inputs.tag != '' && inputs.tag || '0.0.0' }},enable=${{ inputs.tag != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag != '' && inputs.tag || '0.0.0' }},enable=${{ inputs.tag != '' }}
+            type=semver,pattern={{major}},value=${{ inputs.tag != '' && inputs.tag || '0.0.0' }},enable=${{ inputs.tag != '' }}
             type=ref,event=pr
             type=sha
           labels: |
