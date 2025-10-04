@@ -31,10 +31,13 @@ Then you can point freecaster to those files in the config:
 
 ```yaml
 server:
-  ssl: true
-  cert_path: "./keys/certificate.pem"
-  key_path: "./keys/private_key.pkcs.pem"
+  ssl:
+    cert_path: "./keys/certificate.pem"
+    key_path: "./keys/private_key.pkcs.pem"
 ```
+
+When the server.ssl section is present, freecaster will use TLS.
+If the cert_path or key_path is missing, the server will refuse to start.
 
 # Usage
 Setup a config file for all participating nodes, generate keys, then start the server with
@@ -58,22 +61,66 @@ This will get you all `0.3.x` releases, but not `0.4.0`.
 If you want to try the bleeding edge, you can use the `main` tag, which is built from the main branch on every push.
 
 ## Configuration
+
+### Configuration via yaml file
+
+This is the default for freecaster-grid. You can specify the config file path as a command line argument.
+```bash
+freecaster-grid config.yaml
+```
+
 Example config:
 ```yaml
 name: hal9000
-telegram_token: SOME_VERY_LONG_TOKEN
-telegram_chat_id: 1234567890
-secret_key: SOME_VERY_LONG_SECRET_KEY
-webui_enabled: true
+telegram:
+  token: SOME_VERY_LONG_TOKEN
+  chat_id: 1234567890 
+secret_key: SOME_VERY_LONG_SECRET_KEY # Must be the same on all nodes
+webui_enabled: true # Enable web UI at /webui
+announcement_mode: telegram # log or telegram
+poll_time: 10s # How often to poll other nodes 10s = 10 seconds, 5m = 5 minutes, 1h = 1 hour
 server:
-  host: "0.0.0.0:3037"
-  ssl: false
+  ip_address: "0.0.0.0"
+  port: 3037
+  ssl:
+    cert_path: "./keys/certificate.pem"
+    key_path: "./keys/private_key.pkcs.pem"
 nodes:
-  - name: hal9001
+  hal9000: # The key here is not used, it's just for organization
+    address: "http://hal9000:3037"
+    telegram_handle: hal9000
+  hal9001:
     address: "http://hal9001:3037"
     telegram_handle: hal9001
-  - name: hal9002
+  hal9002:
     address: "http://hal9002:3037"
+```
+
+### Configuration via environment variables
+
+You can fully configure freecaster-grid via environment variables as well.
+This is especially useful when deploying with docker.
+
+All variables are prefixed with `FC_`, and nested fields are separated by `__` (double underscore).
+
+The above example using environment variables (dotenv format):
+```env
+FC_NAME=hal9000
+FC_TELEGRAM__TOKEN=SOME_VERY_LONG_TOKEN
+FC_TELEGRAM__CHAT_ID=1234567890
+FC_SECRET_KEY=SOME_VERY_LONG_SECRET_KEY
+FC_WEBUI_ENABLED=true
+FC_ANNOUNCEMENT_MODE=telegram # log or telegram
+FC_POLL_TIME=10s # How often to poll other nodes 10s = 10 seconds, 5m = 5 minutes, 1h = 1 hour
+FC_SERVER__IP_ADDRESS=0.0.0.0
+FC_SERVER__PORT=3037
+FC_SERVER__SSL__CERT_PATH=./keys/certificate.pem
+FC_SERVER__SSL__KEY_PATH=./keys/private_key.pkcs.pem
+FC_NODES__hal9000__ADDRESS=http://hal9000:3037
+FC_NODES__hal9000__TELEGRAM_HANDLE=hal9000
+FC_NODES__hal9001__ADDRESS=http://hal9001:3037
+FC_NODES__hal9001__TELEGRAM_HANDLE=hal9001
+FC_NODES__hal9002__ADDRESS=http://hal9002:3037
 ```
 
 # Testing
@@ -81,3 +128,12 @@ There is a dockerized version available for testing, which enables to run multip
 ```
 docker compose up --build
 ```
+
+## JSON Schema
+
+The JSON schema for the configuration file is located at `./config.schema.json`.
+This can be used to validate your configuration file in your editor, if it supports JSON schema validation.
+
+If you modified the config structure, please also update the schema file.
+The schema can be generated with `cargo run -F json_schema -- config.schema.json`.
+This will write the schema to the specified file.
