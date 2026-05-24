@@ -381,7 +381,10 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
                     roll1.cmp(roll2).then_with(|| name1.cmp(name2))
                 });
 
-                let winner = confirmations_rolls.last().expect("no confirmations?");
+                let Some(winner) = confirmations_rolls.last() else {
+                    error!("No confirmations for node `{}`, skipping", fs.name);
+                    continue;
+                };
                 if winner.0 == poller_config.name {
                     warn!(
                         "Node `{}`'s death to be announced by this node death rolled: {}",

@@ -337,14 +337,15 @@ fn handle_silence(
         return rouille::Response::empty_406();
     }
 
-    let mut gr = server_state.lock().expect("Failed to lock state");
-    let id = rand::rng().random_range(0usize..usize::MAX);
-
+    // Parse before locking — chrono's DateTime + Duration panics on overflow,
+    // and we don't want a bad input to poison the state lock.
     let Some(silent_until) = try_parse_until_time(&time) else {
         return rouille::Response::empty_400();
     };
-
+    let id = rand::rng().random_range(0usize..usize::MAX);
     let target = target.unwrap_or_else(|| server_config.name.clone());
+
+    let mut gr = server_state.lock().expect("Failed to lock state");
 
     // check if target is valid
     if !gr.node_state.iter().any(|fs| fs.name == target) && target != server_config.name {

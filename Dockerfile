@@ -1,4 +1,4 @@
-FROM rust:1.89-alpine3.22 AS chef
+FROM rust:1.91-alpine3.22 AS chef
 RUN apk add curl musl-dev build-base
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | sh
 RUN cargo binstall cargo-chef -y
