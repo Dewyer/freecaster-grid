@@ -7,7 +7,7 @@ use crate::poller::{NodeSilence, State, poller};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local, SubsecRound, Utc};
 use env_logger::Builder;
-use log::{LevelFilter, info, warn};
+use log::{LevelFilter, error, info, warn};
 use rand::Rng;
 use rouille::{Request, Server, router, try_or_400};
 use serde::{Deserialize, Serialize};
@@ -94,6 +94,16 @@ async fn main() -> Result<()> {
         .filter(None, LevelFilter::Info)
         .init();
 
+    // Force-exit on any panic so a supervisor can restart cleanly.
+    // Without this, a panic while holding the state Mutex poisons it and the
+    // process keeps running in a zombie state (every lock() then panics too).
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        default_hook(info);
+        error!("Panic detected, exiting process for clean restart");
+        std::process::exit(1);
+    }));
+
     info!("Starting freecaster-grid v{VERSION}");
     let args: Vec<String> = env::args().collect();
 
@@ -119,16 +129,19 @@ async fn main() -> Result<()> {
 
     let mut js = JoinSet::new();
     let server_config = config.clone();
-    
+
     let state = State::new();
     let server_state = state.clone();
 
     let ssl = server_config.server.ssl.clone();
 
-    let poller_cert = if let Some(SSLConfig { cert_path, ..}) = &server_config.server.ssl {
-        Some(fs::read(cert_path).await
-            .with_context(|| format!("Failed to read certificate from {}", cert_path))
-            .expect("Failed to read certificate"))
+    let poller_cert = if let Some(SSLConfig { cert_path, .. }) = &server_config.server.ssl {
+        Some(
+            fs::read(cert_path)
+                .await
+                .with_context(|| format!("Failed to read certificate from {}", cert_path))
+                .expect("Failed to read certificate"),
+        )
     } else {
         None
     };
@@ -287,7 +300,7 @@ async fn main() -> Result<()> {
             let key = fs::read(key_path).await
                 .with_context(|| format!("Failed to read key from {}", key_path))
                 .expect("Failed to read key");
-            
+
             Server::new_ssl(listener_address, router , cert, key)
                 .expect("Failed to start server")
                 .run()
