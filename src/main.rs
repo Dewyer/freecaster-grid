@@ -200,7 +200,7 @@ async fn main() -> Result<()> {
                     let gr = server_state.lock().expect("Failed to lock state");
                     let dead_nodes = gr.node_state.iter().filter(|fs| fs.is_dead()).map(|fs| DeadNodeResponse {
                         name: fs.name.clone(),
-                        roll: fs.local_announcement_roll.unwrap_or(usize::MAX),
+                        roll: fs.local_announcement_roll.unwrap_or(0),
                     })
                         .collect();
 
@@ -236,12 +236,12 @@ async fn main() -> Result<()> {
                 },
 
                 (GET) (/silence/{key: String}/{time: String}) => {
-                    info!("Called for silence");
+                    info!("Called for silence (self)");
                     handle_silence(&server_config, &server_state, key, time, None)
                 },
 
                 (GET) (/silence/{key: String}/{time: String}/{target: String}) => {
-                    info!("Called for silence");
+                    info!("Called for silence (target: {target})");
                     handle_silence(&server_config, &server_state, key, time, Some(target))
                 },
 
@@ -336,9 +336,7 @@ fn handle_silence(
         warn!("Invalid secret key");
         return rouille::Response::empty_406();
     }
-
-    // Parse before locking — chrono's DateTime + Duration panics on overflow,
-    // and we don't want a bad input to poison the state lock.
+    
     let Some(silent_until) = try_parse_until_time(&time) else {
         return rouille::Response::empty_400();
     };
@@ -377,5 +375,6 @@ fn try_parse_until_time(time: &str) -> Option<DateTime<Utc>> {
     }
 
     let duration = humantime::parse_duration(time).ok()?;
-    Some(Utc::now().trunc_subsecs(0) + duration)
+    let signed = chrono::Duration::from_std(duration).ok()?;
+    Utc::now().trunc_subsecs(0).checked_add_signed(signed)
 }

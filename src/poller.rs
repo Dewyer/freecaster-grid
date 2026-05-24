@@ -148,14 +148,15 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
             gr.silences.clone()
         };
 
-        // broadcast silences
+        // broadcast silences — fan out to every peer; the receive handler is
+        // idempotent on `id`.
         let mut broadcast_silences = vec![];
         for sl in silenced_nodes_clone.iter() {
             if sl.broadcasted {
                 continue;
             }
 
-            // broadcast
+            let mut all_ok = true;
             for (node_name, node) in poller_config.nodes.iter() {
                 let done = call_silence_broadcast(
                     &client,
@@ -166,10 +167,13 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
                 )
                 .await;
 
-                if done {
-                    broadcast_silences.push(sl.clone());
-                    break;
+                if !done {
+                    all_ok = false;
                 }
+            }
+
+            if all_ok {
+                broadcast_silences.push(sl.clone());
             }
         }
 
