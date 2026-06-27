@@ -161,7 +161,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
                 let done = call_silence_broadcast(
                     &client,
                     &poller_config.name,
-                    node.with_name(&node_name),
+                    node.with_name(node_name),
                     &poller_config.secret_key,
                     sl,
                 )
@@ -200,7 +200,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
 
             info!("Checking node {}: {}", node_name, node.address);
             let time = Utc::now();
-            let res = poll_node(&client, &poller_config.name, node.with_name(&node_name)).await;
+            let res = poll_node(&client, &poller_config.name, node.with_name(node_name)).await;
             poll_res.insert((node_name, node.clone()), (res, time));
         }
 
@@ -399,7 +399,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
                         .iter()
                         .find(|(n_name, _)| **n_name == fs.name)
                     {
-                        announcements.push(node.clone());
+                        announcements.push(node);
                     } else {
                         error!("Node `{}` missing from config, cannot announce", fs.name);
                     }

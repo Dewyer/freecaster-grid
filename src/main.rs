@@ -336,7 +336,7 @@ fn handle_silence(
         warn!("Invalid secret key");
         return rouille::Response::empty_406();
     }
-    
+
     let Some(silent_until) = try_parse_until_time(&time) else {
         return rouille::Response::empty_400();
     };
