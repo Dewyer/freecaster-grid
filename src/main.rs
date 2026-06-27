@@ -1,13 +1,13 @@
 mod config;
 mod poller;
 
-use crate::config::{Config, load_config};
+use crate::config::{Config, SSLConfig, load_config};
 
 use crate::poller::{NodeSilence, State, poller};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local, SubsecRound, Utc};
 use env_logger::Builder;
-use log::{LevelFilter, error, info, warn};
+use log::{LevelFilter, info, warn};
 use rand::Rng;
 use rouille::{Request, Server, router, try_or_400};
 use serde::{Deserialize, Serialize};
@@ -98,70 +98,44 @@ async fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 2 {
-        error!("Usage: {} <config_path>", args[0]);
-        std::process::exit(1);
+        warn!("Running without config file")
     }
+
+    let config_path = if args.len() >= 2 {
+        Some(PathBuf::from(&args[1]))
+    } else {
+        None
+    };
 
     // Load and parse config
-    let config_path = PathBuf::from(&args[1]);
     let mut config = load_config(config_path).await?;
-    if let Ok(token) = env::var("TELEGRAM_TOKEN") {
-        info!("Overriding telegram token with env var");
-        config.telegram_token = token;
-    }
-
-    if let Ok(chat_id) = env::var("TELEGRAM_CHAT_ID") {
-        info!("Overriding telegram chat id with env var");
-        config.telegram_chat_id = i64::from_str(&chat_id)?;
-    }
-
-    // WebUI toggle via env var
-    if let Ok(webui_enabled) = env::var("WEBUI_ENABLED") {
-        let enabled = matches!(webui_enabled.as_str(), "1" | "true" | "yes" | "on");
-        info!("Overriding WebUI enabled with env var");
-        config.webui_enabled = enabled;
-    }
 
     // filter myself out
-    config.nodes.retain(|n| n.name != config.name);
+    config.nodes.retain(|name, _| *name != config.name);
 
     let config = Arc::new(config);
 
     info!("Loaded configuration, this node is: {}", config.name);
 
-    let cert = if let Some(cert_path) = &config.server.cert_path {
-        info!("Using certificate from {cert_path:?}");
-        Some(
-            fs::read(cert_path)
-                .await
-                .with_context(|| "Failed to read certificate")?,
-        )
-    } else {
-        None
-    };
-
-    let key = if let Some(key_path) = &config.server.key_path {
-        info!("Using kery from {key_path:?}");
-        Some(
-            fs::read(key_path)
-                .await
-                .with_context(|| "Failed to read key")?,
-        )
-    } else {
-        None
-    };
-
     let mut js = JoinSet::new();
     let server_config = config.clone();
-    let poller_cert = cert.clone();
+    
     let state = State::new();
     let server_state = state.clone();
 
-    js.spawn(async move {
-        info!("Starting server `{}`", server_config.server.host);
+    let ssl = server_config.server.ssl.clone();
 
-        let host = server_config.server.host.clone();
-        let ssl = server_config.server.ssl;
+    let poller_cert = if let Some(SSLConfig { cert_path, ..}) = &server_config.server.ssl {
+        Some(fs::read(cert_path).await
+            .with_context(|| format!("Failed to read certificate from {}", cert_path))
+            .expect("Failed to read certificate"))
+    } else {
+        None
+    };
+
+    js.spawn(async move {
+        let listener_address = format!("{}:{}", server_config.server.ip_address, server_config.server.port);
+        info!("Starting server on {}", listener_address);
 
         let webui_enabled = server_config.webui_enabled;
         let router = move |request: &Request| {
@@ -305,18 +279,21 @@ async fn main() -> Result<()> {
             )
         };
 
-        if ssl {
+        if let Some(SSLConfig { cert_path, key_path}) = &ssl {
             info!("Starting server with SSL");
-            if let (Some(cert), Some(key)) = (cert, key) {
-                Server::new_ssl(host, router , cert, key)
-                    .expect("Failed to start server")
-                    .run()
-            } else {
-                error!("No certificate or key provided in SSL mode, aborting");
-            }
+            let cert = fs::read(cert_path).await
+                .with_context(|| format!("Failed to read certificate from {}", cert_path))
+                .expect("Failed to read certificate");
+            let key = fs::read(key_path).await
+                .with_context(|| format!("Failed to read key from {}", key_path))
+                .expect("Failed to read key");
+            
+            Server::new_ssl(listener_address, router , cert, key)
+                .expect("Failed to start server")
+                .run()
         } else {
             info!("Starting server without SSL");
-            Server::new(host, router)
+            Server::new(listener_address, router)
                 .expect("Failed to start server")
                 .run()
         }
