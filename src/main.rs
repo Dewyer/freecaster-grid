@@ -7,7 +7,7 @@ use crate::poller::{NodeSilence, State, poller};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local, SubsecRound, Utc};
 use env_logger::Builder;
-use log::{LevelFilter, info, warn};
+use log::{LevelFilter, error, info, warn};
 use rand::Rng;
 use rouille::{Request, Server, router, try_or_400};
 use serde::{Deserialize, Serialize};
@@ -94,6 +94,16 @@ async fn main() -> Result<()> {
         .filter(None, LevelFilter::Info)
         .init();
 
+    // Force-exit on any panic so a supervisor can restart cleanly.
+    // Without this, a panic while holding the state Mutex poisons it and the
+    // process keeps running in a zombie state (every lock() then panics too).
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        default_hook(info);
+        error!("Panic detected, exiting process for clean restart");
+        std::process::exit(1);
+    }));
+
     info!("Starting freecaster-grid v{VERSION}");
     let args: Vec<String> = env::args().collect();
 
@@ -119,16 +129,19 @@ async fn main() -> Result<()> {
 
     let mut js = JoinSet::new();
     let server_config = config.clone();
-    
+
     let state = State::new();
     let server_state = state.clone();
 
     let ssl = server_config.server.ssl.clone();
 
-    let poller_cert = if let Some(SSLConfig { cert_path, ..}) = &server_config.server.ssl {
-        Some(fs::read(cert_path).await
-            .with_context(|| format!("Failed to read certificate from {}", cert_path))
-            .expect("Failed to read certificate"))
+    let poller_cert = if let Some(SSLConfig { cert_path, .. }) = &server_config.server.ssl {
+        Some(
+            fs::read(cert_path)
+                .await
+                .with_context(|| format!("Failed to read certificate from {}", cert_path))
+                .expect("Failed to read certificate"),
+        )
     } else {
         None
     };
@@ -187,7 +200,7 @@ async fn main() -> Result<()> {
                     let gr = server_state.lock().expect("Failed to lock state");
                     let dead_nodes = gr.node_state.iter().filter(|fs| fs.is_dead()).map(|fs| DeadNodeResponse {
                         name: fs.name.clone(),
-                        roll: fs.local_announcement_roll.unwrap_or(usize::MAX),
+                        roll: fs.local_announcement_roll.unwrap_or(0),
                     })
                         .collect();
 
@@ -223,12 +236,12 @@ async fn main() -> Result<()> {
                 },
 
                 (GET) (/silence/{key: String}/{time: String}) => {
-                    info!("Called for silence");
+                    info!("Called for silence (self)");
                     handle_silence(&server_config, &server_state, key, time, None)
                 },
 
                 (GET) (/silence/{key: String}/{time: String}/{target: String}) => {
-                    info!("Called for silence");
+                    info!("Called for silence (target: {target})");
                     handle_silence(&server_config, &server_state, key, time, Some(target))
                 },
 
@@ -287,7 +300,7 @@ async fn main() -> Result<()> {
             let key = fs::read(key_path).await
                 .with_context(|| format!("Failed to read key from {}", key_path))
                 .expect("Failed to read key");
-            
+
             Server::new_ssl(listener_address, router , cert, key)
                 .expect("Failed to start server")
                 .run()
@@ -324,14 +337,13 @@ fn handle_silence(
         return rouille::Response::empty_406();
     }
 
-    let mut gr = server_state.lock().expect("Failed to lock state");
-    let id = rand::rng().random_range(0usize..usize::MAX);
-
     let Some(silent_until) = try_parse_until_time(&time) else {
         return rouille::Response::empty_400();
     };
-
+    let id = rand::rng().random_range(0usize..usize::MAX);
     let target = target.unwrap_or_else(|| server_config.name.clone());
+
+    let mut gr = server_state.lock().expect("Failed to lock state");
 
     // check if target is valid
     if !gr.node_state.iter().any(|fs| fs.name == target) && target != server_config.name {
@@ -363,5 +375,6 @@ fn try_parse_until_time(time: &str) -> Option<DateTime<Utc>> {
     }
 
     let duration = humantime::parse_duration(time).ok()?;
-    Some(Utc::now().trunc_subsecs(0) + duration)
+    let signed = chrono::Duration::from_std(duration).ok()?;
+    Utc::now().trunc_subsecs(0).checked_add_signed(signed)
 }

@@ -148,28 +148,32 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
             gr.silences.clone()
         };
 
-        // broadcast silences
+        // broadcast silences — fan out to every peer; the receive handler is
+        // idempotent on `id`.
         let mut broadcast_silences = vec![];
         for sl in silenced_nodes_clone.iter() {
             if sl.broadcasted {
                 continue;
             }
 
-            // broadcast
+            let mut all_ok = true;
             for (node_name, node) in poller_config.nodes.iter() {
                 let done = call_silence_broadcast(
                     &client,
                     &poller_config.name,
-                    node.with_name(&node_name),
+                    node.with_name(node_name),
                     &poller_config.secret_key,
                     sl,
                 )
                 .await;
 
-                if done {
-                    broadcast_silences.push(sl.clone());
-                    break;
+                if !done {
+                    all_ok = false;
                 }
+            }
+
+            if all_ok {
+                broadcast_silences.push(sl.clone());
             }
         }
 
@@ -196,7 +200,7 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
 
             info!("Checking node {}: {}", node_name, node.address);
             let time = Utc::now();
-            let res = poll_node(&client, &poller_config.name, node.with_name(&node_name)).await;
+            let res = poll_node(&client, &poller_config.name, node.with_name(node_name)).await;
             poll_res.insert((node_name, node.clone()), (res, time));
         }
 
@@ -204,11 +208,11 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
         let dead_copies = {
             let mut gr = state.lock().expect("Failed to lock state");
             for ((node_name, node), (res, time)) in poll_res {
-                let fail_state = gr
-                    .node_state
-                    .iter_mut()
-                    .find(|fs| fs.name == *node_name)
-                    .expect("node");
+                let Some(fail_state) = gr.node_state.iter_mut().find(|fs| fs.name == *node_name)
+                else {
+                    warn!("Polled node `{}` missing from state, skipping", *node_name);
+                    continue;
+                };
 
                 fail_state.last_poll = Some(time);
 
@@ -296,11 +300,17 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
             let mut gr = state.lock().expect("Failed to lock state");
             for (from, orb) in obi_response {
                 for dead_resp in orb.dead_nodes {
-                    let fs = gr
+                    let Some(fs) = gr
                         .node_state
                         .iter_mut()
                         .find(|fs| fs.name == dead_resp.name && fs.is_dead())
-                        .expect("node");
+                    else {
+                        warn!(
+                            "Obituary from `{from}` references `{}` which is not known-dead locally, skipping",
+                            dead_resp.name
+                        );
+                        continue;
+                    };
 
                     warn!("Node `{}` is confirmed dead by `{from}`", dead_resp.name);
                     fs.confirmations.insert(
@@ -375,18 +385,24 @@ pub async fn poller(poller_config: Arc<Config>, cert: Option<Vec<u8>>, state: St
                     roll1.cmp(roll2).then_with(|| name1.cmp(name2))
                 });
 
-                let winner = confirmations_rolls.last().expect("no confirmations?");
+                let Some(winner) = confirmations_rolls.last() else {
+                    error!("No confirmations for node `{}`, skipping", fs.name);
+                    continue;
+                };
                 if winner.0 == poller_config.name {
                     warn!(
                         "Node `{}`'s death to be announced by this node death rolled: {}",
                         fs.name, winner.1
                     );
-                    let node = poller_config
+                    if let Some(node) = poller_config
                         .nodes
                         .iter()
                         .find(|(n_name, _)| **n_name == fs.name)
-                        .expect("node");
-                    announcements.push(node);
+                    {
+                        announcements.push(node);
+                    } else {
+                        error!("Node `{}` missing from config, cannot announce", fs.name);
+                    }
                 } else {
                     warn!(
                         "Node `{}`'s death to be announced by `{}` death rolled: {}",
